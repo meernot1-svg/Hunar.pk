@@ -14,6 +14,7 @@ export async function GET() {
     return NextResponse.json({ workers });
   } catch (e) {
     console.error("[workers GET] error:", e);
-    return NextResponse.json({ error: "Failed to load workers." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Failed to load workers.", detail: msg }, { status: 500 });
   }
 }

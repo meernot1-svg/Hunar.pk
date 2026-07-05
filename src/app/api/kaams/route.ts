@@ -47,7 +47,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ kaams, total: kaams.length });
   } catch (e) {
     console.error("[kaams GET] error:", e);
-    return NextResponse.json({ error: "Failed to load kaams." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Failed to load kaams.", detail: msg }, { status: 500 });
   }
 }
 
