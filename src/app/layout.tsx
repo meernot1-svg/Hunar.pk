@@ -115,6 +115,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   colorScheme: "dark",
+  viewportFit: "cover",
 };
 
 /* JSON-LD structured data for SEO */

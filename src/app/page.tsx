@@ -263,10 +263,10 @@ function KaamCard({
   return (
     <div
       onClick={() => onOpen(kaam)}
-      className="group cursor-pointer rounded-2xl border border-white/5 bg-slate-900/60 p-3 transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+      className="group flex cursor-pointer flex-col rounded-2xl border border-white/5 bg-slate-900/60 p-2.5 transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)] active:scale-[0.98] md:p-3"
     >
       {/* Image */}
-      <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-xl">
+      <div className="relative mb-2.5 aspect-[16/10] overflow-hidden rounded-xl md:mb-3">
         {kaam.thumbnail ? (
           <img
             src={kaam.thumbnail}
@@ -276,7 +276,7 @@ function KaamCard({
         ) : (
           <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
         )}
-        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
           {cat?.name}
         </span>
       </div>
@@ -287,10 +287,10 @@ function KaamCard({
           e.stopPropagation();
           onWorker(worker.id);
         }}
-        className="mb-2 flex w-full items-center gap-2 text-left"
+        className="mb-1.5 flex w-full items-center gap-1.5 text-left md:mb-2"
       >
         <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-[10px] font-bold text-white`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-[10px] font-bold text-white md:h-7 md:w-7`}
         >
           {worker.initials}
         </span>
@@ -304,32 +304,36 @@ function KaamCard({
       </button>
 
       {/* Title */}
-      <h3 className="mb-1 line-clamp-1 text-sm font-bold text-white">{kaam.title}</h3>
-      <p className="mb-3 line-clamp-1 text-xs text-slate-400">{kaam.description}</p>
+      <h3 className="mb-0.5 line-clamp-2 text-sm font-bold leading-snug text-white md:mb-1 md:line-clamp-1">{kaam.title}</h3>
+      <p className="mb-2.5 line-clamp-1 text-xs text-slate-400 md:mb-3">{kaam.description}</p>
 
       {/* Rating + delivery */}
-      <div className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+      <div className="mb-2.5 flex items-center gap-1.5 text-xs text-slate-400 md:mb-3 md:gap-2">
         <Stars rating={kaam.rating} size={12} />
         <span className="font-medium text-slate-300">{kaam.rating}</span>
         <span className="text-slate-600">({kaam.reviews})</span>
         <span className="text-slate-600">·</span>
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-0.5">
           <iconify-icon icon="mdi:clock-outline" width={12} />
           {deliveryLabel(kaam.deliveryDays)}
         </span>
       </div>
 
-      {/* Price + CTA */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-base font-extrabold text-green-400">{formatPKR(kaam.price)}</span>
+      {/* Price + CTA — pushes to bottom with mt-auto */}
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/5 pt-2.5">
+        <div className="min-w-0">
+          <div className="text-[10px] text-slate-500">Starting at</div>
+          <div className="truncate text-base font-extrabold leading-tight text-green-400 md:text-lg">{formatPKR(kaam.price)}</div>
+        </div>
         <a
           href={waLink(worker.phone, kaam.title)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 rounded-lg bg-green-500 px-2.5 py-1.5 text-xs font-semibold text-green-950 transition-colors hover:bg-green-400"
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg bg-green-500 px-3 text-xs font-semibold text-green-950 transition-colors hover:bg-green-400 active:scale-95 md:h-10 md:px-4 md:text-sm"
+          aria-label={`Chat with ${worker.name} on WhatsApp`}
         >
-          <iconify-icon icon="mdi:whatsapp" width={14} />
+          <iconify-icon icon="mdi:whatsapp" width={16} />
           <span className="hidden sm:inline">WhatsApp Chat</span>
           <span className="sm:hidden">Chat</span>
         </a>
@@ -342,26 +346,26 @@ function WorkerCard({ worker, onOpen }: { worker: Worker; onOpen: (id: string) =
   return (
     <button
       onClick={() => onOpen(worker.id)}
-      className="group flex flex-col items-center rounded-2xl border border-white/5 bg-slate-900/60 p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+      className="group flex flex-col items-center rounded-2xl border border-white/5 bg-slate-900/60 p-2.5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)] active:scale-[0.98] md:p-4"
     >
       <span
-        className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-lg font-bold text-white ring-2 ${LEVEL_STYLES[worker.level].ring}`}
+        className={`mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-sm font-bold text-white ring-2 md:h-16 md:w-16 md:text-lg ${LEVEL_STYLES[worker.level].ring}`}
       >
         {worker.initials}
       </span>
-      <h3 className="text-sm font-bold text-white">{worker.name}</h3>
-      <p className="mb-2 flex items-center gap-1 text-xs text-slate-400">
-        <iconify-icon icon="mdi:map-marker" width={12} />
+      <h3 className="line-clamp-1 text-xs font-bold text-white md:text-sm">{worker.name}</h3>
+      <p className="mb-1.5 flex items-center gap-0.5 text-[10px] text-slate-400 md:mb-2 md:text-xs">
+        <iconify-icon icon="mdi:map-marker" width={11} />
         {worker.city}
       </p>
-      <span className={`mb-3 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${LEVEL_STYLES[worker.level].badge}`}>
-        {worker.level} Worker
+      <span className={`mb-2 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold md:mb-3 md:px-2 md:text-[10px] ${LEVEL_STYLES[worker.level].badge}`}>
+        {worker.level}
       </span>
-      <div className="flex items-center gap-1 text-xs text-slate-300">
-        <Stars rating={worker.rating} size={12} />
+      <div className="flex items-center gap-0.5 text-xs text-slate-300 md:gap-1">
+        <Stars rating={worker.rating} size={11} />
         <span className="font-semibold">{worker.rating}</span>
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">{worker.totalKaam} Kaam Done</p>
+      <p className="mt-0.5 text-[10px] text-slate-500 md:mt-1 md:text-[11px]">{worker.totalKaam} Kaam</p>
     </button>
   );
 }
@@ -992,52 +996,55 @@ export default function Home() {
       </header>
 
       {/* ===== Mobile top bar ===== */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl md:hidden">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl md:hidden safe-top" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="flex h-14 items-center justify-between px-4">
           <BrandMark onClick={() => goView("home")} />
-          {currentUser ? (
-            <button
-              onClick={() => goView("profile")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-green-950"
-            >
-              {currentUser.name.charAt(0).toUpperCase()}
-            </button>
-          ) : (
-            <button
-              onClick={() => openAuth()}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200"
-            >
-              Create Account
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {currentUser ? (
+              <button
+                onClick={() => goView("profile")}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-green-950 transition-transform active:scale-95"
+                aria-label="My profile"
+              >
+                {currentUser.name.charAt(0).toUpperCase()}
+              </button>
+            ) : (
+              <button
+                onClick={() => openAuth()}
+                className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors active:bg-white/5"
+              >
+                Create Account
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* ===== Main content ===== */}
-      <main className="relative z-10 flex-1 pb-24 md:pb-10" aria-label="Main content">
+      <main className="relative z-10 flex-1 pb-28 md:pb-10" aria-label="Main content">
         {/* ------------------------------------------------
             VIEW: HOME
             ------------------------------------------------ */}
         {view === "home" && !profileWorker && (
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             {/* Hero */}
-            <section className="relative overflow-hidden rounded-3xl border border-white/5 bg-slate-900/40 px-5 py-12 text-center md:px-12 md:py-20">
+            <section className="relative overflow-hidden rounded-3xl border border-white/5 bg-slate-900/40 px-5 py-10 text-center mt-4 md:px-12 md:py-20">
               {/* green gradient glow */}
               <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-green-500/30 blur-[100px] animate-pulse-glow" />
               <div className="pointer-events-none absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-emerald-600/20 blur-[100px]" />
 
               <div className="relative">
-                <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+                <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-400">
                   <iconify-icon icon="mdi:star-four-points" width={14} />
                   Pakistan&apos;s Biggest Local Freelancing Network
                 </span>
-                <h1 className="mx-auto max-w-3xl text-3xl font-extrabold leading-tight tracking-tight md:text-5xl">
+                <h1 className="mx-auto max-w-3xl text-[1.75rem] font-extrabold leading-[1.15] tracking-tight text-balance md:text-5xl">
                   Pakistani Talent.{" "}
                   <span className="bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent">
                     World-Class Value.
                   </span>
                 </h1>
-                <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 md:text-lg">
+                <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 text-pretty md:text-lg">
                   Offer your kaam or find kaam — everything in PKR.
                 </p>
                 {/* Visually hidden SEO description for crawlers */}
@@ -1049,8 +1056,8 @@ export default function Home() {
                 </p>
 
                 {/* Search bar */}
-                <div className="mx-auto mt-8 flex max-w-2xl items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 shadow-2xl backdrop-blur">
-                  <span className="pl-2 text-slate-500">
+                <div className="mx-auto mt-7 flex max-w-2xl items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 shadow-2xl backdrop-blur">
+                  <span className="shrink-0 pl-2 text-slate-500">
                     <iconify-icon icon="mdi:magnify" width={22} />
                   </span>
                   <input
@@ -1062,31 +1069,31 @@ export default function Home() {
                         goView("explore");
                       }
                     }}
-                    placeholder="Search kaam... (e.g. logo, website, SEO)"
+                    placeholder="Search kaam... (e.g. logo, website)"
                     aria-label="Search kaam on Hunar.pk"
-                    className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                   />
                   <button
                     onClick={() => {
                       setExploreSearch(homeSearch);
                       goView("explore");
                     }}
-                    className="shrink-0 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 md:px-6"
+                    className="shrink-0 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 active:scale-95 md:px-6"
                   >
                     Search
                   </button>
                 </div>
 
                 {/* Stats */}
-                <div className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-3">
+                <div className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-2.5 md:gap-4">
                   {[
                     { num: "12K+", label: "Workers", icon: "mdi:account-group" },
                     { num: "45K+", label: "Kaam Posted", icon: "mdi:briefcase" },
                     { num: "8.2Cr", label: "PKR Paid Out", icon: "mdi:cash" },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-2xl border border-white/5 bg-slate-900/50 px-3 py-4">
-                      <iconify-icon icon={s.icon} width={22} class="mx-auto mb-1 text-green-400" />
-                      <div className="text-lg font-extrabold text-white md:text-2xl">{s.num}</div>
+                    <div key={s.label} className="rounded-2xl border border-white/5 bg-slate-900/50 px-2 py-3 md:px-3 md:py-4">
+                      <iconify-icon icon={s.icon} width={20} height={20} class="mx-auto mb-1 text-green-400" />
+                      <div className="text-base font-extrabold text-white md:text-2xl">{s.num}</div>
                       <div className="text-[10px] text-slate-400 md:text-xs">{s.label}</div>
                     </div>
                   ))}
@@ -1095,18 +1102,18 @@ export default function Home() {
             </section>
 
             {/* Categories */}
-            <section className="mt-10">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-lg font-bold md:text-2xl">Categories</h2>
+            <section className="mt-10 md:mt-12">
+              <div className="mb-4 flex items-center justify-between md:mb-5">
+                <h2 className="text-xl font-bold md:text-2xl">Categories</h2>
                 <button
                   onClick={() => goView("explore")}
-                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/10 hover:text-green-300 md:text-sm"
                 >
                   View All
                   <iconify-icon icon="mdi:arrow-right" width={16} />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-4">
                 {CATEGORIES.map((c) => (
                   <button
                     key={c.id}
@@ -1115,12 +1122,12 @@ export default function Home() {
                       setExploreSearch("");
                       goView("explore");
                     }}
-                    className="group flex flex-col items-start rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+                    className="group flex flex-col items-start rounded-2xl border border-white/5 bg-slate-900/50 p-3.5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)] active:scale-[0.98] md:p-4"
                   >
-                    <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-green-500/10 text-green-400 transition-colors group-hover:bg-green-500/20">
-                      <iconify-icon icon={c.icon} width={24} />
+                    <span className="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-400 transition-colors group-hover:bg-green-500/20 md:h-11 md:w-11">
+                      <iconify-icon icon={c.icon} width={22} height={22} />
                     </span>
-                    <h3 className="text-sm font-bold text-white">{c.name}</h3>
+                    <h3 className="text-sm font-bold leading-tight text-white">{c.name}</h3>
                     <p className="text-xs text-slate-500">{c.count}</p>
                   </button>
                 ))}
@@ -1128,15 +1135,15 @@ export default function Home() {
             </section>
 
             {/* Trending Kaam */}
-            <section className="mt-12">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-bold md:text-2xl">
-                  <iconify-icon icon="mdi:fire" width={22} class="text-orange-400" />
+            <section className="mt-10 md:mt-12">
+              <div className="mb-4 flex items-center justify-between md:mb-5">
+                <h2 className="flex items-center gap-2 text-xl font-bold md:text-2xl">
+                  <iconify-icon icon="mdi:fire" width={22} height={22} class="text-orange-400" />
                   Trending Kaam
                 </h2>
                 <button
                   onClick={() => goView("explore")}
-                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/10 hover:text-green-300 md:text-sm"
                 >
                   View All
                   <iconify-icon icon="mdi:arrow-right" width={16} />
@@ -1153,15 +1160,15 @@ export default function Home() {
             </section>
 
             {/* Top Workers */}
-            <section className="mt-12">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-bold md:text-2xl">
-                  <iconify-icon icon="mdi:crown" width={22} class="text-amber-400" />
+            <section className="mt-10 md:mt-12">
+              <div className="mb-4 flex items-center justify-between md:mb-5">
+                <h2 className="flex items-center gap-2 text-xl font-bold md:text-2xl">
+                  <iconify-icon icon="mdi:crown" width={22} height={22} class="text-amber-400" />
                   Top Workers
                 </h2>
                 <button
                   onClick={() => goView("explore")}
-                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/10 hover:text-green-300 md:text-sm"
                 >
                   View All
                   <iconify-icon icon="mdi:arrow-right" width={16} />
@@ -1178,9 +1185,9 @@ export default function Home() {
             </section>
 
             {/* How it works */}
-            <section className="mt-12 rounded-3xl border border-white/5 bg-slate-900/40 p-6 md:p-10">
-              <h2 className="mb-6 text-center text-lg font-bold md:text-2xl">How It Works</h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <section className="mt-10 rounded-3xl border border-white/5 bg-slate-900/40 p-5 md:mt-12 md:p-10">
+              <h2 className="mb-5 text-center text-xl font-bold md:mb-6 md:text-2xl">How It Works</h2>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
                 {[
                   { icon: "mdi:magnify", title: "1. Find Kaam", desc: "Browse kaam by category or city to find what you need." },
                   { icon: "mdi:whatsapp", title: "2. Chat on WhatsApp", desc: "Message the worker directly on WhatsApp — no commission." },
@@ -1204,15 +1211,15 @@ export default function Home() {
             ------------------------------------------------ */}
         {view === "explore" && !profileWorker && (
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="py-6">
+            <div className="py-5 md:py-6">
               <h1 className="mb-1 text-2xl font-extrabold md:text-3xl">Explore Kaam</h1>
               <p className="text-sm text-slate-400">
                 Browse kaam from Pakistan&apos;s best workers — all in PKR.
               </p>
 
               {/* Search */}
-              <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-2">
-                <span className="pl-2 text-slate-500">
+              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-2 md:mt-5">
+                <span className="shrink-0 pl-2 text-slate-500">
                   <iconify-icon icon="mdi:magnify" width={20} />
                 </span>
                 <input
@@ -1220,12 +1227,13 @@ export default function Home() {
                   onChange={(e) => setExploreSearch(e.target.value)}
                   placeholder="Search kaam..."
                   aria-label="Search kaam listings"
-                  className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                 />
                 {exploreSearch && (
                   <button
                     onClick={() => setExploreSearch("")}
-                    className="px-2 text-slate-500 hover:text-white"
+                    className="shrink-0 px-2 py-1 text-slate-500 hover:text-white"
+                    aria-label="Clear search"
                   >
                     <iconify-icon icon="mdi:close" width={18} />
                   </button>
@@ -1233,10 +1241,10 @@ export default function Home() {
               </div>
 
               {/* Category pills */}
-              <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+              <div className="no-scrollbar snap-x-row mt-4 flex gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setExploreCat("all")}
-                  className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+                  className={`shrink-0 rounded-full border px-4 py-2 text-xs font-medium transition-colors active:scale-95 ${
                     exploreCat === "all"
                       ? "border-green-500 bg-green-500 text-green-950"
                       : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
@@ -1248,7 +1256,7 @@ export default function Home() {
                   <button
                     key={c.id}
                     onClick={() => setExploreCat(c.id)}
-                    className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+                    className={`shrink-0 rounded-full border px-4 py-2 text-xs font-medium transition-colors active:scale-95 ${
                       exploreCat === c.id
                         ? "border-green-500 bg-green-500 text-green-950"
                         : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
@@ -1260,13 +1268,13 @@ export default function Home() {
               </div>
 
               {/* City + Sort */}
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="mt-4 flex flex-wrap items-center gap-2 md:gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-slate-400">
                   <iconify-icon icon="mdi:map-marker" width={16} />
                   <select
                     value={exploreCity}
                     onChange={(e) => setExploreCity(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs text-white focus:border-green-500 focus:outline-none"
+                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-xs text-white focus:border-green-500 focus:outline-none"
                   >
                     {CITIES.map((c) => (
                       <option key={c} value={c} className="bg-slate-900">
@@ -1275,12 +1283,12 @@ export default function Home() {
                     ))}
                   </select>
                 </label>
-                <label className="flex items-center gap-2 text-xs text-slate-400">
+                <label className="flex items-center gap-1.5 text-xs text-slate-400">
                   <iconify-icon icon="mdi:sort" width={16} />
                   <select
                     value={exploreSort}
                     onChange={(e) => setExploreSort(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs text-white focus:border-green-500 focus:outline-none"
+                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-xs text-white focus:border-green-500 focus:outline-none"
                   >
                     {SORT_OPTIONS.map((s) => (
                       <option key={s.id} value={s.id} className="bg-slate-900">
@@ -1289,7 +1297,7 @@ export default function Home() {
                     ))}
                   </select>
                 </label>
-                <span className="ml-auto text-xs text-slate-500">{filteredKaams.length} kaam found</span>
+                <span className="w-full text-xs text-slate-500 md:w-auto md:ml-auto">{filteredKaams.length} kaam found</span>
               </div>
 
               {/* Grid */}
@@ -1487,7 +1495,7 @@ export default function Home() {
                       Upload a thumbnail
                     </span>
                     <span className="mt-0.5 text-xs text-slate-500">
-                      This becomes the main image on your kaam card (PNG, JPG, max 2MB)
+                      This becomes the main image on your kaam card (PNG, JPG, max 1.5MB)
                     </span>
                     <input
                       type="file"
@@ -1517,7 +1525,7 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => removeSample(i)}
-                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white transition-opacity opacity-100 group-hover:opacity-100"
                           aria-label="Remove sample"
                         >
                           <iconify-icon icon="mdi:close" width={14} />
@@ -1534,7 +1542,7 @@ export default function Home() {
                       Upload your work samples
                     </span>
                     <span className="mt-0.5 text-xs text-slate-500">
-                      PNG, JPG (max 2MB each, up to 5)
+                      PNG, JPG (max 1.5MB each, up to 5)
                     </span>
                     <input
                       type="file"
@@ -1551,7 +1559,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={postBusy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <iconify-icon icon={postBusy ? "mdi:loading mdi-spin" : "mdi:rocket-launch"} width={18} />
                 {postBusy ? "Posting…" : "Post Kaam"}
@@ -1749,38 +1757,38 @@ export default function Home() {
             </div>
 
             {/* Tabs */}
-            <div className="mb-5 flex gap-2">
+            <div className="no-scrollbar mb-5 flex gap-2 overflow-x-auto pb-1">
               <button
                 onClick={() => setAdminTab("users")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   adminTab === "users"
                     ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                     : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
                 }`}
               >
-                <iconify-icon icon="mdi:account-group" width={16} class="mr-1.5 align-middle" />
+                <iconify-icon icon="mdi:account-group" width={16} height={16} />
                 Users
               </button>
               <button
                 onClick={() => setAdminTab("workers")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   adminTab === "workers"
                     ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                     : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
                 }`}
               >
-                <iconify-icon icon="mdi:account-tie" width={16} class="mr-1.5 align-middle" />
+                <iconify-icon icon="mdi:account-tie" width={16} height={16} />
                 Workers
               </button>
               <button
                 onClick={() => setAdminTab("kaam")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   adminTab === "kaam"
                     ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                     : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
                 }`}
               >
-                <iconify-icon icon="mdi:file-multiple" width={16} class="mr-1.5 align-middle" />
+                <iconify-icon icon="mdi:file-multiple" width={16} height={16} />
                 Kaam Posts
               </button>
             </div>
@@ -1789,7 +1797,7 @@ export default function Home() {
             {adminTab === "users" && (
               <div>
                 <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 p-2">
-                  <span className="pl-2 text-slate-500">
+                  <span className="shrink-0 pl-2 text-slate-500">
                     <iconify-icon icon="mdi:magnify" width={18} />
                   </span>
                   <input
@@ -1797,7 +1805,7 @@ export default function Home() {
                     onChange={(e) => setAdminSearch(e.target.value)}
                     placeholder="Search by name or city..."
                     aria-label="Search users in admin panel"
-                    className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                   />
                 </div>
 
@@ -2067,38 +2075,40 @@ export default function Home() {
       </main>
 
       {/* ===== Footer ===== */}
-      <footer className="relative z-10 mt-auto border-t border-white/5 bg-slate-950/80 px-4 py-6 pb-24 md:px-6 md:pb-6">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 md:flex-row">
-          <div className="flex items-center gap-2">
-            <Logo size={24} />
-            <span className="font-display font-extrabold">
-              Hunar<span className="text-green-400">.pk</span>
-            </span>
-            <span className="text-xs text-slate-500">· Pakistani Talent. World-Class Value.</span>
+      <footer className="relative z-10 mt-auto border-t border-white/5 bg-slate-950/80 px-4 py-6 pb-28 md:px-6 md:pb-6">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 md:flex-row md:gap-4">
+          <div className="flex flex-col items-center gap-1 md:flex-row md:items-center md:gap-2">
+            <div className="flex items-center gap-2">
+              <Logo size={24} />
+              <span className="font-display font-extrabold">
+                Hunar<span className="text-green-400">.pk</span>
+              </span>
+            </div>
+            <span className="text-center text-xs text-slate-500 md:text-left">· Pakistani Talent. World-Class Value.</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
-            <button onClick={() => goView("home")} className="hover:text-slate-300">
+          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-500" aria-label="Footer navigation">
+            <button onClick={() => goView("home")} className="py-1 transition-colors hover:text-slate-300">
               About
             </button>
-            <button onClick={() => goView("home")} className="hover:text-slate-300">
+            <button onClick={() => goView("home")} className="py-1 transition-colors hover:text-slate-300">
               Contact
             </button>
-            <button onClick={() => goView("admin")} className="flex items-center gap-1 hover:text-amber-400">
+            <button onClick={() => goView("admin")} className="flex items-center gap-1 py-1 transition-colors hover:text-amber-400">
               <iconify-icon icon="mdi:shield-crown" width={13} />
               Admin
             </button>
-            <button onClick={() => goView("home")} className="hover:text-slate-300">
+            <button onClick={() => goView("home")} className="py-1 transition-colors hover:text-slate-300">
               Terms
             </button>
-            <button onClick={() => goView("home")} className="hover:text-slate-300">
+            <button onClick={() => goView("home")} className="py-1 transition-colors hover:text-slate-300">
               Privacy
             </button>
-          </div>
+          </nav>
         </div>
       </footer>
 
       {/* ===== Mobile bottom nav ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-slate-950/95 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-slate-950/95 backdrop-blur-xl md:hidden safe-bottom" aria-label="Mobile navigation" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="grid grid-cols-4">
           {[
             { id: "home" as ViewId, label: "Home", icon: "mdi:home" },
@@ -2115,12 +2125,12 @@ export default function Home() {
                 }
                 goView(item.id);
               }}
-              className={`flex flex-col items-center gap-0.5 py-2.5 transition-colors ${
-                activeNav === item.id ? "text-green-400" : "text-slate-500"
+              className={`mobile-nav-item flex flex-col items-center justify-center gap-0.5 pt-2.5 pb-1.5 transition-colors ${
+                activeNav === item.id ? "active text-green-400" : "text-slate-500"
               }`}
             >
-              <iconify-icon icon={item.icon} width={22} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <iconify-icon icon={item.icon} width={22} height={22} />
+              <span className="text-[10px] font-medium leading-none">{item.label}</span>
             </button>
           ))}
         </div>
@@ -2135,15 +2145,21 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in" />
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-t-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl animate-slide-up md:rounded-3xl md:animate-scale-in"
+            className="relative flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-slate-900 shadow-2xl animate-slide-up md:max-h-[90vh] md:rounded-3xl md:animate-scale-in"
           >
+            {/* Drag handle (mobile only) */}
+            <div className="flex justify-center pt-3 md:hidden">
+              <div className="h-1 w-10 rounded-full bg-white/20" />
+            </div>
             <button
               onClick={() => setAuthModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-white"
+              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+              aria-label="Close"
             >
-              <iconify-icon icon="mdi:close" width={22} />
+              <iconify-icon icon="mdi:close" width={20} />
             </button>
 
+            <div className="overflow-y-auto px-5 pb-6 pt-4 hunar-scroll md:px-6 md:pt-6">
             <div className="mb-5 text-center">
               <Logo size={56} />
               <h2 className="mt-3 text-xl font-extrabold">
@@ -2371,6 +2387,7 @@ export default function Home() {
                 )}
               </form>
             )}
+            </div>
           </div>
         </div>
       )}
@@ -2456,6 +2473,8 @@ function KaamDetailModal({
         onClick={(e) => e.stopPropagation()}
         className="hunar-scroll relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-white/10 bg-slate-900 shadow-2xl animate-slide-up md:rounded-3xl md:animate-scale-in"
       >
+        {/* Drag handle (mobile only) */}
+        <div className="absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-white/20 md:hidden" />
         {/* Header image */}
         <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-3xl">
           {kaam.thumbnail ? (
@@ -2570,7 +2589,7 @@ function KaamDetailModal({
             href={waLink(worker.phone, kaam.title)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-base font-bold text-green-950 transition-colors hover:bg-green-400"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-4 text-base font-bold text-green-950 transition-colors hover:bg-green-400 active:scale-[0.98]"
           >
             <iconify-icon icon="mdi:whatsapp" width={22} />
             WhatsApp Chat

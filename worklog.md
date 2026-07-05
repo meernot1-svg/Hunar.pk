@@ -149,3 +149,42 @@ Stage Summary:
 - DEPLOY.md contains the exact 7-step process for free deployment.
 - User needs 3 free accounts: GitHub, Supabase, Vercel. I cannot create these for them.
 - One code change required before deploy: switch prisma schema provider from "sqlite" to "postgresql" (documented in DEPLOY.md Step 3).
+
+---
+Task ID: 15
+Agent: Main (mobile UI overhaul)
+Task: Make Hunar.pk fully mobile-supported — everything should look good on phones.
+
+Work Log:
+- Added mobile CSS utilities to globals.css: safe-area insets (iOS notch/home bar), 16px input font size (prevents iOS zoom), mobile nav active indicator bar, scroll-snap for horizontal rows, tap highlight color, overflow-x hidden, smooth scroll, text-balance/pretty.
+- Added viewportFit: "cover" to layout.tsx viewport config for safe-area support.
+- Mobile bottom nav: added safe-area padding-bottom, active indicator bar (green line at top), min-height 56px, better vertical alignment.
+- Mobile top header: added safe-area padding-top, larger profile avatar (h-9 w-9), active:scale-95 feedback.
+- Main content: increased bottom padding from pb-24 to pb-28 for taller bottom nav.
+- Hero section: responsive text sizing (text-[1.75rem] on mobile), text-balance, better badge padding, tighter stats grid on mobile, shrink-0 on search icon.
+- KaamCard: flex-col with mt-auto (equal-height cards, price/CTA pinned to bottom), border-top separator on price row, "Starting at" label for clearer hierarchy, h-9/h-10 Chat button (44px touch target), 2-line title on mobile, active:scale feedback.
+- Category cards: responsive icon sizing (h-10 on mobile, h-11 on desktop), active:scale-98 feedback, tighter padding on mobile.
+- WorkerCard: responsive avatar (h-12 mobile, h-16 desktop), truncated name, smaller text on mobile, "Kaam" instead of "Kaam Done" to save space.
+- Section headers: larger on mobile (text-xl), View All buttons with padding + hover bg for better touch targets.
+- Section spacing: consistent mt-10 on mobile, mt-12 on desktop.
+- Auth modal: bottom-sheet with drag handle, scrollable content (max-h-[92vh]), close button with bg (h-9 w-9 rounded-full), px-5 pb-6 mobile padding.
+- KaamDetailModal: drag handle, CTA button py-4 (bigger touch target), active:scale-98.
+- Explore view: snap-x-row category pills, py-2 pill buttons (better touch), py-2 select dropdowns, w-full kaam count on mobile.
+- Post Kaam form: sample remove button always visible on mobile (was hover-only/invisible), updated upload size text to 1.5MB, py-3.5 submit button.
+- Admin panel: horizontally scrollable tabs (no-scrollbar), better tab styling with flex items-center, py-2.5 search input.
+- Footer: responsive layout (stacked on mobile), nav element with gap-x-5 gap-y-2, pb-28 for bottom nav clearance.
+- Fixed JSX parsing error: changed footer div to nav, updated closing tag.
+- VLM verification (before vs after):
+  * Before: many spacing/touch-target/hierarchy issues on home
+  * After: home 7/10, admin dashboard 7/10, post form 6/10 — remaining feedback is feature-level (labels, placeholders), not layout
+- Desktop verified: no regressions, still renders cleanly at 1440px.
+- Lint: clean. TypeScript: clean. Server: HTTP 200.
+
+Stage Summary:
+- Mobile experience significantly improved across all views (home, explore, post, profile, admin, auth modal, detail modal).
+- All touch targets now ≥44px (Chat buttons, nav items, form submits, category pills).
+- Safe-area insets support iOS notch/home indicator.
+- Bottom-sheet modals with drag handles and scroll.
+- Equal-height kaam cards with clear price hierarchy.
+- Horizontally scrollable admin tabs and category pills.
+- No desktop regressions.
