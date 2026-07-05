@@ -36,7 +36,8 @@ interface Kaam {
   workerId: string;
   rating: number;
   reviews: number;
-  image: string; // gradient key
+  image: string; // gradient key (fallback)
+  thumbnail?: string; // uploaded thumbnail (base64 data URL) — main image shown on cards
   samples?: string[]; // uploaded sample images as base64 data URLs
 }
 
@@ -581,7 +582,15 @@ function KaamCard({
     >
       {/* Image */}
       <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-xl">
-        <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
+        {kaam.thumbnail ? (
+          <img
+            src={kaam.thumbnail}
+            alt={kaam.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
+        )}
         <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
           {cat?.name}
         </span>
@@ -716,6 +725,7 @@ export default function Home() {
     description: "",
   });
   const [postSamples, setPostSamples] = useState<string[]>([]); // base64 data URLs
+  const [postThumbnail, setPostThumbnail] = useState<string | null>(null); // main card thumbnail (base64 data URL)
 
   // admin: state-backed users + kaams so they can be deleted
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
@@ -930,6 +940,7 @@ export default function Home() {
         rating: 5,
         reviews: 0,
         image: "g1",
+        thumbnail: postThumbnail ?? undefined,
         samples: postSamples.length ? postSamples : undefined,
       };
       // add to state + persist to localStorage
@@ -947,9 +958,10 @@ export default function Home() {
       showToast("Kaam posted successfully! It is now live.");
       setPostForm({ title: "", category: "", price: "", delivery: "3", description: "" });
       setPostSamples([]);
+      setPostThumbnail(null);
       goView("explore");
     },
-    [currentUser, postForm, postSamples, showToast, openAuth, goView],
+    [currentUser, postForm, postSamples, postThumbnail, showToast, openAuth, goView],
   );
 
   /* ---------- Image upload handler (FileReader → base64) ---------- */
@@ -995,6 +1007,38 @@ export default function Home() {
   const removeSample = useCallback((idx: number) => {
     setPostSamples((prev) => prev.filter((_, i) => i !== idx));
   }, []);
+
+  /* ---------- Thumbnail upload (single main image, shown on the kaam card) ---------- */
+  const handleThumbnailUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        showToast("Only image files are allowed.", "error");
+        e.target.value = "";
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        showToast("Thumbnail too large (max 2MB).", "error");
+        e.target.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPostThumbnail(reader.result as string);
+        showToast("Thumbnail added — this is how your kaam will look.", "success");
+      };
+      reader.onerror = () => showToast("Failed to read image.", "error");
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    },
+    [showToast],
+  );
+
+  const removeThumbnail = useCallback(() => {
+    setPostThumbnail(null);
+    showToast("Thumbnail removed.", "info");
+  }, [showToast]);
 
   /* ---------- Admin actions ---------- */
   const deleteKaam = useCallback(
@@ -1642,6 +1686,75 @@ export default function Home() {
                 />
               </div>
 
+              {/* Thumbnail (main image shown on the kaam card) */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-300">
+                  Thumbnail Image
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    Main image people see on your kaam card
+                  </span>
+                </label>
+
+                {postThumbnail ? (
+                  <div className="space-y-3">
+                    {/* Live preview styled like the real kaam card */}
+                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 p-3">
+                      <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-xl">
+                        <img
+                          src={postThumbnail}
+                          alt="Thumbnail preview"
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                          {CATEGORIES.find((c) => c.id === postForm.category)?.name ?? "Category"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={removeThumbnail}
+                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-red-500/80"
+                          aria-label="Remove thumbnail"
+                        >
+                          <iconify-icon icon="mdi:trash-can-outline" width={14} />
+                        </button>
+                      </div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <iconify-icon icon="mdi:eye-outline" width={14} class="text-green-400" />
+                        This is how your kaam will look to people browsing Hunar.pk.
+                      </p>
+                    </div>
+                    {/* Replace option */}
+                    <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 py-2.5 text-xs font-medium text-slate-300 transition-colors hover:border-green-500/40 hover:text-white">
+                      <iconify-icon icon="mdi:image-sync-outline" width={16} />
+                      Replace thumbnail
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailUpload}
+                        className="sr-only"
+                        aria-label="Replace thumbnail"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-slate-950/40 py-8 text-center transition-colors hover:border-green-500/40">
+                    <iconify-icon icon="mdi:image-plus" width={40} class="text-slate-500" />
+                    <span className="mt-2 text-sm font-medium text-slate-300">
+                      Upload a thumbnail
+                    </span>
+                    <span className="mt-0.5 text-xs text-slate-500">
+                      This becomes the main image on your kaam card (PNG, JPG, max 2MB)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailUpload}
+                      className="sr-only"
+                      aria-label="Upload thumbnail"
+                    />
+                  </label>
+                )}
+              </div>
+
               {/* Samples (real image upload) */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-300">
@@ -1683,7 +1796,7 @@ export default function Home() {
                       accept="image/*"
                       multiple
                       onChange={handleSampleUpload}
-                      className="hidden"
+                      className="sr-only"
                       aria-label="Upload sample images"
                     />
                   </label>
@@ -2069,9 +2182,15 @@ export default function Home() {
                           key={k.id}
                           className="flex items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/50 p-3"
                         >
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-400">
-                            <iconify-icon icon={cat?.icon ?? "mdi:file"} width={20} />
-                          </span>
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
+                            {k.thumbnail ? (
+                              <img src={k.thumbnail} alt={k.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center bg-green-500/10 text-green-400">
+                                <iconify-icon icon={cat?.icon ?? "mdi:file"} width={20} />
+                              </span>
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-white">{k.title}</p>
                             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-400">
@@ -2584,7 +2703,15 @@ function KaamDetailModal({
       >
         {/* Header image */}
         <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-3xl">
-          <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
+          {kaam.thumbnail ? (
+            <img
+              src={kaam.thumbnail}
+              alt={kaam.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
+          )}
           <button
             onClick={onClose}
             className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"

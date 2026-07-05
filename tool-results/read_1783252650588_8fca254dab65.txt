@@ -1,0 +1,2002 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useCallback, useEffect, useMemo, useState } from "react";
+     4→     4→
+     5→     5→/* ============================================================
+     6→     6→   HUNAR.PK — Pakistan's biggest local freelancing network
+     7→     7→   Single-page client app. No "Gig" word — only "Kaam".
+     8→     8→   ============================================================ */
+     9→     9→
+    10→    10→/* ---------- Types ---------- */
+    11→    11→type WorkerLevel = "New" | "Rising" | "Top";
+    12→    12→type UserRole = "worker" | "viewer" | "admin";
+    13→    13→
+    14→    14→interface Worker {
+    15→    15→  id: string;
+    16→    16→  name: string;
+    17→    17→  city: string;
+    18→    18→  level: WorkerLevel;
+    19→    19→  rating: number;
+    20→    20→  totalKaam: number;
+    21→    21→  repeatClients: number;
+    22→    22→  gradient: string; // tailwind gradient classes for avatar
+    23→    23→  initials: string;
+    24→    24→  phone: string; // 92XXXXXXXXXX
+    25→    25→  bio: string;
+    26→    26→  portfolio: string[]; // gradient keys
+    27→    27→}
+    28→    28→
+    29→    29→interface Kaam {
+    30→    30→  id: string;
+    31→    31→  title: string;
+    32→    32→  description: string;
+    33→    33→  price: number;
+    34→    34→  deliveryDays: 1 | 3 | 7 | 15;
+    35→    35→  category: string; // category id
+    36→    36→  workerId: string;
+    37→    37→  rating: number;
+    38→    38→  reviews: number;
+    39→    39→  image: string; // gradient key
+    40→    40→  samples?: string[]; // uploaded sample images as base64 data URLs
+    41→    41→}
+    42→    42→
+    43→    43→interface Category {
+    44→    44→  id: string;
+    45→    45→  name: string;
+    46→    46→  icon: string;
+    47→    47→  count: string;
+    48→    48→}
+    49→    49→
+    50→    50→interface UserAccount {
+    51→    51→  id: string;
+    52→    52→  name: string;
+    53→    53→  role: UserRole;
+    54→    54→  city: string;
+    55→    55→  phone: string;
+    56→    56→  level?: WorkerLevel;
+    57→    57→  joined: string;
+    58→    58→}
+    59→    59→
+    60→    60→/* Stored auth user (includes password for login check) */
+    61→    61→interface StoredUser extends UserAccount {
+    62→    62→  password: string;
+    63→    63→}
+    64→    64→
+    65→    65→type ViewId = "home" | "explore" | "post" | "profile" | "admin";
+    66→    66→
+    67→    67→/* ---------- Static data ---------- */
+    68→    68→const CATEGORIES: Category[] = [
+    69→    69→  { id: "logo", name: "Logo Design", icon: "mdi:palette", count: "2.4K+ Kaam" },
+    70→    70→  { id: "web", name: "Website", icon: "mdi:web", count: "1.8K+ Kaam" },
+    71→    71→  { id: "video", name: "Video Editing", icon: "mdi:video", count: "1.2K+ Kaam" },
+    72→    72→  { id: "seo", name: "SEO", icon: "mdi:chart-line-variant", count: "980+ Kaam" },
+    73→    73→  { id: "writing", name: "Content Writing", icon: "mdi:pen", count: "3.1K+ Kaam" },
+    74→    74→  { id: "social", name: "Social Media", icon: "mdi:facebook", count: "1.5K+ Kaam" },
+    75→    75→  { id: "app", name: "App Development", icon: "mdi:cellphone-link", count: "760+ Kaam" },
+    76→    76→  { id: "photo", name: "Photography", icon: "mdi:camera", count: "640+ Kaam" },
+    77→    77→];
+    78→    78→
+    79→    79→const CITIES = [
+    80→    80→  "All Cities",
+    81→    81→  "Karachi",
+    82→    82→  "Lahore",
+    83→    83→  "Islamabad",
+    84→    84→  "Rawalpindi",
+    85→    85→  "Faisalabad",
+    86→    86→  "Multan",
+    87→    87→  "Peshawar",
+    88→    88→];
+    89→    89→
+    90→    90→const SORT_OPTIONS = [
+    91→    91→  { id: "recommended", label: "Recommended" },
+    92→    92→  { id: "price-low", label: "Price: Low to High" },
+    93→    93→  { id: "price-high", label: "Price: High to Low" },
+    94→    94→];
+    95→    95→
+    96→    96→const WORKERS: Worker[] = [
+    97→    97→  {
+    98→    98→    id: "w1",
+    99→    99→    name: "Ahmed Raza",
+   100→   100→    city: "Karachi",
+   101→   101→    level: "Top",
+   102→   102→    rating: 4.9,
+   103→   103→    totalKaam: 214,
+   104→   104→    repeatClients: 78,
+   105→   105→    gradient: "from-emerald-500 to-teal-600",
+   106→   106→    initials: "AR",
+   107→   107→    phone: "923001234567",
+   108→   108→    bio: "5 years of experience in logo and brand identity design. Studied graphic design at Karachi University.",
+   109→   109→    portfolio: ["g1", "g2", "g3", "g4", "g5", "g6"],
+   110→   110→  },
+   111→   111→  {
+   112→   112→    id: "w2",
+   113→   113→    name: "Fatima Khan",
+   114→   114→    city: "Lahore",
+   115→   115→    level: "Rising",
+   116→   116→    rating: 4.8,
+   117→   117→    totalKaam: 96,
+   118→   118→    repeatClients: 41,
+   119→   119→    gradient: "from-pink-500 to-rose-600",
+   120→   120→    initials: "FK",
+   121→   121→    phone: "923011234568",
+   122→   122→    bio: "WordPress developer and SEO specialist. Based in Lahore, built 200+ websites.",
+   123→   123→    portfolio: ["g2", "g4", "g1", "g6", "g3", "g5"],
+   124→   124→  },
+   125→   125→  {
+   126→   126→    id: "w3",
+   127→   127→    name: "Hassan Ali",
+   128→   128→    city: "Islamabad",
+   129→   129→    level: "Top",
+   130→   130→    rating: 5.0,
+   131→   131→    totalKaam: 188,
+   132→   132→    repeatClients: 92,
+   133→   133→    gradient: "from-sky-500 to-indigo-600",
+   134→   134→    initials: "HA",
+   135→   135→    phone: "923021234569",
+   136→   136→    bio: "YouTube video editor and color grading expert. 4K editing, fast delivery guaranteed.",
+   137→   137→    portfolio: ["g3", "g1", "g5", "g2", "g4", "g6"],
+   138→   138→  },
+   139→   139→  {
+   140→   140→    id: "w4",
+   141→   141→    name: "Ayesha Siddiqui",
+   142→   142→    city: "Rawalpindi",
+   143→   143→    level: "Rising",
+   144→   144→    rating: 4.7,
+   145→   145→    totalKaam: 73,
+   146→   146→    repeatClients: 35,
+   147→   147→    gradient: "from-violet-500 to-purple-600",
+   148→   148→    initials: "AS",
+   149→   149→    phone: "923031234570",
+   150→   150→    bio: "Urdu and English content writer. Blogs, articles, and website copy.",
+   151→   151→    portfolio: ["g4", "g6", "g2", "g1", "g5", "g3"],
+   152→   152→  },
+   153→   153→  {
+   154→   154→    id: "w5",
+   155→   155→    name: "Ali Hamza",
+   156→   156→    city: "Faisalabad",
+   157→   157→    level: "New",
+   158→   158→    rating: 4.6,
+   159→   159→    totalKaam: 24,
+   160→   160→    repeatClients: 8,
+   161→   161→    gradient: "from-amber-500 to-orange-600",
+   162→   162→    initials: "AH",
+   163→   163→    phone: "923041234571",
+   164→   164→    bio: "Social media manager and Facebook ads expert. New but results guaranteed.",
+   165→   165→    portfolio: ["g5", "g3", "g1", "g6", "g2", "g4"],
+   166→   166→  },
+   167→   167→  {
+   168→   168→    id: "w6",
+   169→   169→    name: "Zainab Malik",
+   170→   170→    city: "Multan",
+   171→   171→    level: "Top",
+   172→   172→    rating: 4.9,
+   173→   173→    totalKaam: 152,
+   174→   174→    repeatClients: 64,
+   175→   175→    gradient: "from-cyan-500 to-blue-600",
+   176→   176→    initials: "ZM",
+   177→   177→    phone: "923051234572",
+   178→   178→    bio: "Mobile app developer (Flutter + React Native). 50+ apps live on Play Store.",
+   179→   179→    portfolio: ["g6", "g2", "g4", "g3", "g1", "g5"],
+   180→   180→  },
+   181→   181→];
+   182→   182→
+   183→   183→const INITIAL_KAAMS: Kaam[] = [
+   184→   184→  {
+   185→   185→    id: "k1",
+   186→   186→    title: "Logo design 24 ghante mein",
+   187→   187→    description: "Professional logo design with 3 concepts, unlimited revisions aur source files.",
+   188→   188→    price: 2500,
+   189→   189→    deliveryDays: 1,
+   190→   190→    category: "logo",
+   191→   191→    workerId: "w1",
+   192→   192→    rating: 4.9,
+   193→   193→    reviews: 127,
+   194→   194→    image: "g1",
+   195→   195→  },
+   196→   196→  {
+   197→   197→    id: "k2",
+   198→   198→    title: "WordPress website banayen",
+   199→   199→    description: "Complete responsive WordPress website with premium theme aur SEO setup.",
+   200→   200→    price: 18000,
+   201→   201→    deliveryDays: 7,
+   202→   202→    category: "web",
+   203→   203→    workerId: "w2",
+   204→   204→    rating: 4.8,
+   205→   205→    reviews: 64,
+   206→   206→    image: "g2",
+   207→   207→  },
+   208→   208→  {
+   209→   209→    id: "k3",
+   210→   210→    title: "YouTube video edit karunga",
+   211→   211→    description: "Professional video editing with color grading, transitions aur sound design.",
+   212→   212→    price: 5000,
+   213→   213→    deliveryDays: 3,
+   214→   214→    category: "video",
+   215→   215→    workerId: "w3",
+   216→   216→    rating: 5.0,
+   217→   217→    reviews: 89,
+   218→   218→    image: "g3",
+   219→   219→  },
+   220→   220→  {
+   221→   221→    id: "k4",
+   222→   222→    title: "Urdu article likhunga",
+   223→   223→    description: "1000 words ka SEO-optimized Urdu article kisi bhi topic par.",
+   224→   224→    price: 1500,
+   225→   225→    deliveryDays: 3,
+   226→   226→    category: "writing",
+   227→   227→    workerId: "w4",
+   228→   228→    rating: 4.7,
+   229→   229→    reviews: 52,
+   230→   230→    image: "g4",
+   231→   231→  },
+   232→   232→  {
+   233→   233→    id: "k5",
+   234→   234→    title: "SEO optimize karunga",
+   235→   235→    description: "On-page SEO audit aur optimization Google ranking ke liye.",
+   236→   236→    price: 8000,
+   237→   237→    deliveryDays: 7,
+   238→   238→    category: "seo",
+   239→   239→    workerId: "w2",
+   240→   240→    rating: 4.8,
+   241→   241→    reviews: 38,
+   242→   242→    image: "g5",
+   243→   243→  },
+   244→   244→  {
+   245→   245→    id: "k6",
+   246→   246→    title: "Facebook page manage karunga",
+   247→   247→    description: "Monthly social media management with 30 posts aur engagement.",
+   248→   248→    price: 12000,
+   249→   249→    deliveryDays: 15,
+   250→   250→    category: "social",
+   251→   251→    workerId: "w5",
+   252→   252→    rating: 4.6,
+   253→   253→    reviews: 19,
+   254→   254→    image: "g6",
+   255→   255→  },
+   256→   256→  {
+   257→   257→    id: "k7",
+   258→   258→    title: "Flutter app banayen",
+   259→   259→    description: "Cross-platform mobile app Android aur iOS ke liye, with API integration.",
+   260→   260→    price: 45000,
+   261→   261→    deliveryDays: 15,
+   262→   262→    category: "app",
+   263→   263→    workerId: "w6",
+   264→   264→    rating: 4.9,
+   265→   265→    reviews: 31,
+   266→   266→    image: "g2",
+   267→   267→  },
+   268→   268→  {
+   269→   269→    id: "k8",
+   270→   270→    title: "Product photography karunga",
+   271→   271→    description: "Professional product shoot with studio lighting aur editing.",
+   272→   272→    price: 6000,
+   273→   273→    deliveryDays: 3,
+   274→   274→    category: "photo",
+   275→   275→    workerId: "w3",
+   276→   276→    rating: 4.9,
+   277→   277→    reviews: 44,
+   278→   278→    image: "g1",
+   279→   279→  },
+   280→   280→  {
+   281→   281→    id: "k9",
+   282→   282→    title: "Brand identity package",
+   283→   283→    description: "Logo, business card, letterhead aur social media templates — sab kuch.",
+   284→   284→    price: 7500,
+   285→   285→    deliveryDays: 7,
+   286→   286→    category: "logo",
+   287→   287→    workerId: "w1",
+   288→   288→    rating: 5.0,
+   289→   289→    reviews: 73,
+   290→   290→    image: "g3",
+   291→   291→  },
+   292→   292→  {
+   293→   293→    id: "k10",
+   294→   294→    title: "Blog content likhunga",
+   295→   295→    description: "Engaging English blog posts 1500 words, SEO friendly aur plagiarism free.",
+   296→   296→    price: 3000,
+   297→   297→    deliveryDays: 3,
+   298→   298→    category: "writing",
+   299→   299→    workerId: "w4",
+   300→   300→    rating: 4.7,
+   301→   301→    reviews: 28,
+   302→   302→    image: "g4",
+   303→   303→  },
+   304→   304→  {
+   305→   305→    id: "k11",
+   306→   306→    title: "Instagram reels banayen",
+   307→   307→    description: "15 viral Instagram reels with trending audio aur captions.",
+   308→   308→    price: 4000,
+   309→   309→    deliveryDays: 7,
+   310→   310→    category: "social",
+   311→   311→    workerId: "w5",
+   312→   312→    rating: 4.6,
+   313→   313→    reviews: 22,
+   314→   314→    image: "g6",
+   315→   315→  },
+   316→   316→  {
+   317→   317→    id: "k12",
+   318→   318→    title: "React website banayen",
+   319→   319→    description: "Modern React + Next.js website with fast loading aur beautiful UI.",
+   320→   320→    price: 35000,
+   321→   321→    deliveryDays: 15,
+   322→   322→    category: "web",
+   323→   323→    workerId: "w6",
+   324→   324→    rating: 4.9,
+   325→   325→    reviews: 17,
+   326→   326→    image: "g2",
+   327→   327→  },
+   328→   328→];
+   329→   329→
+   330→   330→/* Initial user accounts (workers + viewers + admin) for the admin panel */
+   331→   331→const INITIAL_USERS: UserAccount[] = [
+   332→   332→  ...WORKERS.map((w) => ({
+   333→   333→    id: w.id,
+   334→   334→    name: w.name,
+   335→   335→    role: "worker" as UserRole,
+   336→   336→    city: w.city,
+   337→   337→    phone: w.phone,
+   338→   338→    level: w.level,
+   339→   339→    joined: "2024",
+   340→   340→  })),
+   341→   341→  { id: "u1", name: "Bilal Ahmed", role: "viewer" as UserRole, city: "Karachi", phone: "923061111111", joined: "2025" },
+   342→   342→  { id: "u2", name: "Sana Tariq", role: "viewer" as UserRole, city: "Lahore", phone: "923062222222", joined: "2025" },
+   343→   343→  { id: "u3", name: "Usman Ghani", role: "viewer" as UserRole, city: "Islamabad", phone: "923063333333", joined: "2025" },
+   344→   344→  { id: "admin", name: "Site Admin", role: "admin" as UserRole, city: "Islamabad", phone: "923000000000", joined: "2023" },
+   345→   345→];
+   346→   346→
+   347→   347→/* Gradient map for placeholder images */
+   348→   348→const GRADIENTS: Record<string, string> = {
+   349→   349→  g1: "from-emerald-500/30 to-teal-600/30",
+   350→   350→  g2: "from-sky-500/30 to-indigo-600/30",
+   351→   351→  g3: "from-pink-500/30 to-rose-600/30",
+   352→   352→  g4: "from-violet-500/30 to-purple-600/30",
+   353→   353→  g5: "from-amber-500/30 to-orange-600/30",
+   354→   354→  g6: "from-cyan-500/30 to-blue-600/30",
+   355→   355→};
+   356→   356→
+   357→   357→const PORTFOLIO_ICONS: Record<string, string> = {
+   358→   358→  g1: "mdi:palette",
+   359→   359→  g2: "mdi:web",
+   360→   360→  g3: "mdi:video",
+   361→   361→  g4: "mdi:pen",
+   362→   362→  g5: "mdi:facebook",
+   363→   363→  g6: "mdi:cellphone-link",
+   364→   364→};
+   365→   365→
+   366→   366→const LEVEL_STYLES: Record<WorkerLevel, { badge: string; ring: string; label: string }> = {
+   367→   367→  New: {
+   368→   368→    badge: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+   369→   369→    ring: "ring-sky-500/40",
+   370→   370→    label: "New",
+   371→   371→  },
+   372→   372→  Rising: {
+   373→   373→    badge: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+   374→   374→    ring: "ring-violet-500/40",
+   375→   375→    label: "Rising",
+   376→   376→  },
+   377→   377→  Top: {
+   378→   378→    badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+   379→   379→    ring: "ring-amber-500/40",
+   380→   380→    label: "Top",
+   381→   381→  },
+   382→   382→};
+   383→   383→
+   384→   384→const ROLE_STYLES: Record<UserRole, { badge: string; label: string; icon: string }> = {
+   385→   385→  worker: { badge: "bg-green-500/15 text-green-400 border-green-500/30", label: "Worker", icon: "mdi:briefcase" },
+   386→   386→  viewer: { badge: "bg-sky-500/15 text-sky-400 border-sky-500/30", label: "Viewer", icon: "mdi:account-search" },
+   387→   387→  admin: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", label: "Admin", icon: "mdi:shield-crown" },
+   388→   388→};
+   389→   389→
+   390→   390→/* Admin access password (demo) */
+   391→   391→const ADMIN_PASSWORD = "BA56CR7VK18";
+   392→   392→
+   393→   393→/* ---------- localStorage keys (persist auth + user-posted kaam, survives export) ---------- */
+   394→   394→const LS_USERS = "hunar_users_db";
+   395→   395→const LS_SESSION = "hunar_session";
+   396→   396→const LS_KAAMS = "hunar_user_kaams";
+   397→   397→const LS_WORKERS = "hunar_user_workers";
+   398→   398→
+   399→   399→function loadStoredUsers(): StoredUser[] {
+   400→   400→  if (typeof window === "undefined") return [];
+   401→   401→  try {
+   402→   402→    const raw = window.localStorage.getItem(LS_USERS);
+   403→   403→    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
+   404→   404→  } catch {
+   405→   405→    return [];
+   406→   406→  }
+   407→   407→}
+   408→   408→function saveStoredUsers(list: StoredUser[]) {
+   409→   409→  if (typeof window === "undefined") return;
+   410→   410→  try {
+   411→   411→    window.localStorage.setItem(LS_USERS, JSON.stringify(list));
+   412→   412→  } catch {
+   413→   413→    /* ignore quota */
+   414→   414→  }
+   415→   415→}
+   416→   416→function loadSession(): StoredUser | null {
+   417→   417→  if (typeof window === "undefined") return null;
+   418→   418→  try {
+   419→   419→    const raw = window.localStorage.getItem(LS_SESSION);
+   420→   420→    return raw ? (JSON.parse(raw) as StoredUser) : null;
+   421→   421→  } catch {
+   422→   422→    return null;
+   423→   423→  }
+   424→   424→}
+   425→   425→function saveSession(u: StoredUser | null) {
+   426→   426→  if (typeof window === "undefined") return;
+   427→   427→  try {
+   428→   428→    if (u) window.localStorage.setItem(LS_SESSION, JSON.stringify(u));
+   429→   429→    else window.localStorage.removeItem(LS_SESSION);
+   430→   430→  } catch {
+   431→   431→    /* ignore */
+   432→   432→  }
+   433→   433→}
+   434→   434→function loadUserKaams(): Kaam[] {
+   435→   435→  if (typeof window === "undefined") return [];
+   436→   436→  try {
+   437→   437→    const raw = window.localStorage.getItem(LS_KAAMS);
+   438→   438→    return raw ? (JSON.parse(raw) as Kaam[]) : [];
+   439→   439→  } catch {
+   440→   440→    return [];
+   441→   441→  }
+   442→   442→}
+   443→   443→function saveUserKaams(list: Kaam[]) {
+   444→   444→  if (typeof window === "undefined") return;
+   445→   445→  try {
+   446→   446→    window.localStorage.setItem(LS_KAAMS, JSON.stringify(list));
+   447→   447→  } catch {
+   448→   448→    /* ignore quota */
+   449→   449→  }
+   450→   450→}
+   451→   451→function loadUserWorkers(): Worker[] {
+   452→   452→  if (typeof window === "undefined") return [];
+   453→   453→  try {
+   454→   454→    const raw = window.localStorage.getItem(LS_WORKERS);
+   455→   455→    return raw ? (JSON.parse(raw) as Worker[]) : [];
+   456→   456→  } catch {
+   457→   457→    return [];
+   458→   458→  }
+   459→   459→}
+   460→   460→function saveUserWorkers(list: Worker[]) {
+   461→   461→  if (typeof window === "undefined") return;
+   462→   462→  try {
+   463→   463→    window.localStorage.setItem(LS_WORKERS, JSON.stringify(list));
+   464→   464→  } catch {
+   465→   465→    /* ignore quota */
+   466→   466→  }
+   467→   467→}
+   468→   468→
+   469→   469→/* ---------- Helpers ---------- */
+   470→   470→function formatPKR(n: number): string {
+   471→   471→  return "Rs. " + n.toLocaleString("en-PK");
+   472→   472→}
+   473→   473→
+   474→   474→function deliveryLabel(days: number): string {
+   475→   475→  return `${days} day${days > 1 ? "s" : ""}`;
+   476→   476→}
+   477→   477→
+   478→   478→function waLink(phone: string, kaamTitle?: string): string {
+   479→   479→  const text = kaamTitle
+   480→   480→    ? `Assalam o Alaikum! I saw your kaam on Hunar.pk — "${kaamTitle}". Let's discuss the details.`
+   481→   481→    : "Assalam o Alaikum! I saw your profile on Hunar.pk. I'd like to hire you for some kaam.";
+   482→   482→  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+   483→   483→}
+   484→   484→
+   485→   485→function avatarGradient(name: string): string {
+   486→   486→  const grads = [
+   487→   487→    "from-emerald-500 to-teal-600",
+   488→   488→    "from-pink-500 to-rose-600",
+   489→   489→    "from-sky-500 to-indigo-600",
+   490→   490→    "from-violet-500 to-purple-600",
+   491→   491→    "from-amber-500 to-orange-600",
+   492→   492→    "from-cyan-500 to-blue-600",
+   493→   493→  ];
+   494→   494→  let h = 0;
+   495→   495→  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+   496→   496→  return grads[h % grads.length];
+   497→   497→}
+   498→   498→
+   499→   499→/* ---------- Reusable UI bits ---------- */
+   500→   500→
+   501→   501→function Logo({ size = 36 }: { size?: number }) {
+   502→   502→  return (
+   503→   503→    <img
+   504→   504→      src="/hunar-logo.svg"
+   505→   505→      alt="Hunar.pk logo"
+   506→   506→      width={size}
+   507→   507→      height={size}
+   508→   508→      className="shrink-0 rounded-xl shadow-[0_4px_14px_-4px_rgba(34,197,94,0.55)]"
+   509→   509→    />
+   510→   510→  );
+   511→   511→}
+   512→   512→
+   513→   513→function BrandMark({ onClick }: { onClick?: () => void }) {
+   514→   514→  return (
+   515→   515→    <button onClick={onClick} className="flex items-center gap-2.5">
+   516→   516→      <Logo size={36} />
+   517→   517→      <span className="font-display text-xl font-extrabold tracking-tight text-white md:text-2xl">
+   518→   518→        Hunar<span className="text-green-400">.pk</span>
+   519→   519→      </span>
+   520→   520→    </button>
+   521→   521→  );
+   522→   522→}
+   523→   523→
+   524→   524→function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+   525→   525→  const full = Math.floor(rating);
+   526→   526→  const hasHalf = rating - full >= 0.5;
+   527→   527→  const stars: React.ReactNode[] = [];
+   528→   528→  for (let i = 0; i < 5; i++) {
+   529→   529→    let icon = "mdi:star-outline";
+   530→   530→    if (i < full) icon = "mdi:star";
+   531→   531→    else if (i === full && hasHalf) icon = "mdi:star-half-full";
+   532→   532→    stars.push(
+   533→   533→      <iconify-icon key={i} icon={icon} width={size} height={size} class="text-amber-400" />,
+   534→   534→    );
+   535→   535→  }
+   536→   536→  return <span className="inline-flex items-center gap-0.5">{stars}</span>;
+   537→   537→}
+   538→   538→
+   539→   539→function GradientImage({
+   540→   540→  gKey,
+   541→   541→  icon,
+   542→   542→  className = "",
+   543→   543→}: {
+   544→   544→  gKey: string;
+   545→   545→  icon?: string;
+   546→   546→  className?: string;
+   547→   547→}) {
+   548→   548→  return (
+   549→   549→    <div className={`relative overflow-hidden bg-gradient-to-br ${GRADIENTS[gKey] ?? GRADIENTS.g1} ${className}`}>
+   550→   550→      <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+   551→   551→      {icon && (
+   552→   552→        <iconify-icon
+   553→   553→          icon={icon}
+   554→   554→          width={40}
+   555→   555→          height={40}
+   556→   556→          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/60"
+   557→   557→        />
+   558→   558→      )}
+   559→   559→    </div>
+   560→   560→  );
+   561→   561→}
+   562→   562→
+   563→   563→function KaamCard({
+   564→   564→  kaam,
+   565→   565→  worker,
+   566→   566→  onOpen,
+   567→   567→  onWorker,
+   568→   568→}: {
+   569→   569→  kaam: Kaam;
+   570→   570→  worker?: Worker;
+   571→   571→  onOpen: (k: Kaam) => void;
+   572→   572→  onWorker: (id: string) => void;
+   573→   573→}) {
+   574→   574→  if (!worker) return null;
+   575→   575→  const cat = CATEGORIES.find((c) => c.id === kaam.category);
+   576→   576→
+   577→   577→  return (
+   578→   578→    <div
+   579→   579→      onClick={() => onOpen(kaam)}
+   580→   580→      className="group cursor-pointer rounded-2xl border border-white/5 bg-slate-900/60 p-3 transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+   581→   581→    >
+   582→   582→      {/* Image */}
+   583→   583→      <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-xl">
+   584→   584→        <GradientImage gKey={kaam.image} icon={cat?.icon} className="h-full w-full" />
+   585→   585→        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+   586→   586→          {cat?.name}
+   587→   587→        </span>
+   588→   588→      </div>
+   589→   589→
+   590→   590→      {/* Worker row */}
+   591→   591→      <button
+   592→   592→        onClick={(e) => {
+   593→   593→          e.stopPropagation();
+   594→   594→          onWorker(worker.id);
+   595→   595→        }}
+   596→   596→        className="mb-2 flex w-full items-center gap-2 text-left"
+   597→   597→      >
+   598→   598→        <span
+   599→   599→          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-[10px] font-bold text-white`}
+   600→   600→        >
+   601→   601→          {worker.initials}
+   602→   602→        </span>
+   603→   603→        <span className="min-w-0 flex-1 truncate text-xs text-slate-300">
+   604→   604→          {worker.name}
+   605→   605→          <span className="text-slate-500"> · {worker.city}</span>
+   606→   606→        </span>
+   607→   607→        <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${LEVEL_STYLES[worker.level].badge}`}>
+   608→   608→          {worker.level}
+   609→   609→        </span>
+   610→   610→      </button>
+   611→   611→
+   612→   612→      {/* Title */}
+   613→   613→      <h3 className="mb-1 line-clamp-1 text-sm font-bold text-white">{kaam.title}</h3>
+   614→   614→      <p className="mb-3 line-clamp-1 text-xs text-slate-400">{kaam.description}</p>
+   615→   615→
+   616→   616→      {/* Rating + delivery */}
+   617→   617→      <div className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+   618→   618→        <Stars rating={kaam.rating} size={12} />
+   619→   619→        <span className="font-medium text-slate-300">{kaam.rating}</span>
+   620→   620→        <span className="text-slate-600">({kaam.reviews})</span>
+   621→   621→        <span className="text-slate-600">·</span>
+   622→   622→        <span className="inline-flex items-center gap-1">
+   623→   623→          <iconify-icon icon="mdi:clock-outline" width={12} />
+   624→   624→          {deliveryLabel(kaam.deliveryDays)}
+   625→   625→        </span>
+   626→   626→      </div>
+   627→   627→
+   628→   628→      {/* Price + CTA */}
+   629→   629→      <div className="flex items-center justify-between gap-2">
+   630→   630→        <span className="text-base font-extrabold text-green-400">{formatPKR(kaam.price)}</span>
+   631→   631→        <a
+   632→   632→          href={waLink(worker.phone, kaam.title)}
+   633→   633→          target="_blank"
+   634→   634→          rel="noopener noreferrer"
+   635→   635→          onClick={(e) => e.stopPropagation()}
+   636→   636→          className="inline-flex items-center gap-1 rounded-lg bg-green-500 px-2.5 py-1.5 text-xs font-semibold text-green-950 transition-colors hover:bg-green-400"
+   637→   637→        >
+   638→   638→          <iconify-icon icon="mdi:whatsapp" width={14} />
+   639→   639→          <span className="hidden sm:inline">WhatsApp Chat</span>
+   640→   640→          <span className="sm:hidden">Chat</span>
+   641→   641→        </a>
+   642→   642→      </div>
+   643→   643→    </div>
+   644→   644→  );
+   645→   645→}
+   646→   646→
+   647→   647→function WorkerCard({ worker, onOpen }: { worker: Worker; onOpen: (id: string) => void }) {
+   648→   648→  return (
+   649→   649→    <button
+   650→   650→      onClick={() => onOpen(worker.id)}
+   651→   651→      className="group flex flex-col items-center rounded-2xl border border-white/5 bg-slate-900/60 p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+   652→   652→    >
+   653→   653→      <span
+   654→   654→        className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${worker.gradient} text-lg font-bold text-white ring-2 ${LEVEL_STYLES[worker.level].ring}`}
+   655→   655→      >
+   656→   656→        {worker.initials}
+   657→   657→      </span>
+   658→   658→      <h3 className="text-sm font-bold text-white">{worker.name}</h3>
+   659→   659→      <p className="mb-2 flex items-center gap-1 text-xs text-slate-400">
+   660→   660→        <iconify-icon icon="mdi:map-marker" width={12} />
+   661→   661→        {worker.city}
+   662→   662→      </p>
+   663→   663→      <span className={`mb-3 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${LEVEL_STYLES[worker.level].badge}`}>
+   664→   664→        {worker.level} Worker
+   665→   665→      </span>
+   666→   666→      <div className="flex items-center gap-1 text-xs text-slate-300">
+   667→   667→        <Stars rating={worker.rating} size={12} />
+   668→   668→        <span className="font-semibold">{worker.rating}</span>
+   669→   669→      </div>
+   670→   670→      <p className="mt-1 text-[11px] text-slate-500">{worker.totalKaam} Kaam Done</p>
+   671→   671→    </button>
+   672→   672→  );
+   673→   673→}
+   674→   674→
+   675→   675→/* ============================================================
+   676→   676→   MAIN COMPONENT
+   677→   677→   ============================================================ */
+   678→   678→export default function Home() {
+   679→   679→  const [view, setView] = useState<ViewId>("home");
+   680→   680→  const [activeNav, setActiveNav] = useState<ViewId>("home");
+   681→   681→
+   682→   682→  // auth
+   683→   683→  const [authModal, setAuthModal] = useState(false);
+   684→   684→  const [authMode, setAuthMode] = useState<"register" | "login">("register");
+   685→   685→  const [authStep, setAuthStep] = useState<"role" | "form">("role");
+   686→   686→  const [authRole, setAuthRole] = useState<"worker" | "viewer" | null>(null);
+   687→   687→  const [authError, setAuthError] = useState("");
+   688→   688→  const [authForm, setAuthForm] = useState({ name: "", phone: "", city: "", password: "" });
+   689→   689→  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+   690→   690→  const [storedUsers, setStoredUsers] = useState<StoredUser[]>([]);
+   691→   691→
+   692→   692→  // kaam detail modal
+   693→   693→  const [detailKaam, setDetailKaam] = useState<Kaam | null>(null);
+   694→   694→
+   695→   695→  // worker profile view
+   696→   696→  const [profileWorkerId, setProfileWorkerId] = useState<string | null>(null);
+   697→   697→
+   698→   698→  // toast
+   699→   699→  const [toast, setToast] = useState<{ msg: string; tone: "success" | "error" | "info" } | null>(null);
+   700→   700→
+   701→   701→  // explore filters
+   702→   702→  const [exploreSearch, setExploreSearch] = useState("");
+   703→   703→  const [exploreCat, setExploreCat] = useState<string>("all");
+   704→   704→  const [exploreCity, setExploreCity] = useState<string>("All Cities");
+   705→   705→  const [exploreSort, setExploreSort] = useState<string>("recommended");
+   706→   706→
+   707→   707→  // home search
+   708→   708→  const [homeSearch, setHomeSearch] = useState("");
+   709→   709→
+   710→   710→  // post kaam form
+   711→   711→  const [postForm, setPostForm] = useState({
+   712→   712→    title: "",
+   713→   713→    category: "",
+   714→   714→    price: "",
+   715→   715→    delivery: "3",
+   716→   716→    description: "",
+   717→   717→  });
+   718→   718→  const [postSamples, setPostSamples] = useState<string[]>([]); // base64 data URLs
+   719→   719→
+   720→   720→  // admin: state-backed users + kaams so they can be deleted
+   721→   721→  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
+   722→   722→  const [kaamsList, setKaamsList] = useState<Kaam[]>(INITIAL_KAAMS);
+   723→   723→  const [adminTab, setAdminTab] = useState<"users" | "workers" | "kaam">("users");
+   724→   724→  const [adminSearch, setAdminSearch] = useState("");
+   725→   725→
+   726→   726→  // workers are state-backed so admin deletions reflect everywhere (Top Workers, cards, profiles)
+   727→   727→  const [workersList, setWorkersList] = useState<Worker[]>(WORKERS);
+   728→   728→
+   729→   729→  // admin auth
+   730→   730→  const [adminAuthed, setAdminAuthed] = useState(false);
+   731→   731→  const [adminPassword, setAdminPassword] = useState("");
+   732→   732→  const [adminError, setAdminError] = useState("");
+   733→   733→
+   734→   734→  /* ---------- Derived: filtered kaams for explore ---------- */
+   735→   735→  const filteredKaams = useMemo(() => {
+   736→   736→    let list = [...kaamsList];
+   737→   737→    if (exploreCat !== "all") {
+   738→   738→      list = list.filter((k) => k.category === exploreCat);
+   739→   739→    }
+   740→   740→    if (exploreCity !== "All Cities") {
+   741→   741→      list = list.filter((k) => {
+   742→   742→        const w = workersList.find((x) => x.id === k.workerId);
+   743→   743→        return w?.city === exploreCity;
+   744→   744→      });
+   745→   745→    }
+   746→   746→    const q = exploreSearch.trim().toLowerCase();
+   747→   747→    if (q) {
+   748→   748→      list = list.filter(
+   749→   749→        (k) =>
+   750→   750→          k.title.toLowerCase().includes(q) ||
+   751→   751→          k.description.toLowerCase().includes(q),
+   752→   752→      );
+   753→   753→    }
+   754→   754→    if (exploreSort === "price-low") list.sort((a, b) => a.price - b.price);
+   755→   755→    else if (exploreSort === "price-high") list.sort((a, b) => b.price - a.price);
+   756→   756→    return list;
+   757→   757→  }, [kaamsList, workersList, exploreCat, exploreCity, exploreSearch, exploreSort]);
+   758→   758→
+   759→   759→  /* ---------- Navigation ---------- */
+   760→   760→  const goView = useCallback((v: ViewId) => {
+   761→   761→    setView(v);
+   762→   762→    setActiveNav(v);
+   763→   763→    setProfileWorkerId(null);
+   764→   764→    if (typeof window !== "undefined") {
+   765→   765→      window.scrollTo({ top: 0, behavior: "smooth" });
+   766→   766→    }
+   767→   767→  }, []);
+   768→   768→
+   769→   769→  const openWorkerProfile = useCallback((id: string) => {
+   770→   770→    setProfileWorkerId(id);
+   771→   771→    setView("home");
+   772→   772→    if (typeof window !== "undefined") {
+   773→   773→      window.scrollTo({ top: 0, behavior: "smooth" });
+   774→   774→    }
+   775→   775→  }, []);
+   776→   776→
+   777→   777→  /* ---------- Toast ---------- */
+   778→   778→  const showToast = useCallback(
+   779→   779→    (msg: string, tone: "success" | "error" | "info" = "success") => {
+   780→   780→      setToast({ msg, tone });
+   781→   781→      window.setTimeout(() => setToast(null), 3200);
+   782→   782→    },
+   783→   783→    [],
+   784→   784→  );
+   785→   785→
+   786→   786→  /* ---------- Mount: load persisted auth + user kaams + user workers from localStorage ---------- */
+   787→   787→  useEffect(() => {
+   788→   788→    const su = loadStoredUsers();
+   789→   789→    setStoredUsers(su);
+   790→   790→    const session = loadSession();
+   791→   791→    if (session) setCurrentUser(session);
+   792→   792→    const userKaams = loadUserKaams();
+   793→   793→    if (userKaams.length) setKaamsList((prev) => [...userKaams, ...prev]);
+   794→   794→    const userWorkers = loadUserWorkers();
+   795→   795→    if (userWorkers.length) setWorkersList((prev) => [...prev, ...userWorkers]);
+   796→   796→  }, []);
+   797→   797→
+   798→   798→  /* ---------- Auth modal ---------- */
+   799→   799→  const openAuth = useCallback((mode: "register" | "login" = "register") => {
+   800→   800→    const m = mode === "login" ? "login" : "register";
+   801→   801→    setAuthMode(m);
+   802→   802→    setAuthStep(m === "login" ? "form" : "role");
+   803→   803→    setAuthRole(null);
+   804→   804→    setAuthError("");
+   805→   805→    setAuthForm({ name: "", phone: "", city: "", password: "" });
+   806→   806→    setAuthModal(true);
+   807→   807→  }, []);
+   808→   808→
+   809→   809→  /* Register a new worker/viewer into localStorage */
+   810→   810→  const registerUser = useCallback(() => {
+   811→   811→    if (!authRole) return;
+   812→   812→    const phone = authForm.phone.trim();
+   813→   813→    if (phone.length < 7) {
+   814→   814→      setAuthError("Please enter a valid phone number.");
+   815→   815→      return;
+   816→   816→    }
+   817→   817→    if (authForm.password.length < 4) {
+   818→   818→      setAuthError("Password must be at least 4 characters.");
+   819→   819→      return;
+   820→   820→    }
+   821→   821→    // duplicate phone check
+   822→   822→    if (storedUsers.some((u) => u.phone === phone)) {
+   823→   823→      setAuthError("An account with this phone already exists. Please login.");
+   824→   824→      return;
+   825→   825→    }
+   826→   826→    const newUser: StoredUser = {
+   827→   827→      id: `u_${Date.now()}`,
+   828→   828→      name: authForm.name.trim() || "User",
+   829→   829→      role: authRole,
+   830→   830→      city: authForm.city || "Karachi",
+   831→   831→      phone,
+   832→   832→      level: authRole === "worker" ? "New" : undefined,
+   833→   833→      joined: new Date().getFullYear().toString(),
+   834→   834→      password: authForm.password,
+   835→   835→    };
+   836→   836→    const next = [...storedUsers, newUser];
+   837→   837→    setStoredUsers(next);
+   838→   838→    saveStoredUsers(next);
+   839→   839→    setCurrentUser(newUser);
+   840→   840→    saveSession(newUser);
+   841→   841→    // also reflect in admin user list
+   842→   842→    setUsers((prev) => [
+   843→   843→      ...prev,
+   844→   844→      { id: newUser.id, name: newUser.name, role: newUser.role, city: newUser.city, phone: newUser.phone, level: newUser.level, joined: newUser.joined },
+   845→   845→    ]);
+   846→   846→    // if worker, also create a worker profile so they show on cards/profile
+   847→   847→    if (newUser.role === "worker") {
+   848→   848→      const newWorker: Worker = {
+   849→   849→        id: newUser.id,
+   850→   850→        name: newUser.name,
+   851→   851→        city: newUser.city,
+   852→   852→        level: "New",
+   853→   853→        rating: 0,
+   854→   854→        totalKaam: 0,
+   855→   855→        repeatClients: 0,
+   856→   856→        gradient: avatarGradient(newUser.name),
+   857→   857→        initials: newUser.name.charAt(0).toUpperCase() + (newUser.name.split(" ")[1]?.charAt(0)?.toUpperCase() ?? ""),
+   858→   858→        phone: newUser.phone,
+   859→   859→        bio: "New worker on Hunar.pk.",
+   860→   860→        portfolio: ["g1", "g2", "g3", "g4"],
+   861→   861→      };
+   862→   862→      setWorkersList((prev) => {
+   863→   863→        const next = [...prev, newWorker];
+   864→   864→        // persist user-created workers (exclude seed WORKERS)
+   865→   865→        saveUserWorkers(next.filter((w) => w.id.startsWith("u_")));
+   866→   866→        return next;
+   867→   867→      });
+   868→   868→    }
+   869→   869→    setAuthModal(false);
+   870→   870→    showToast(
+   871→   871→      authRole === "worker"
+   872→   872→        ? "Worker account created! You can post kaam now."
+   873→   873→        : "Welcome! Find kaam and chat with workers on WhatsApp.",
+   874→   874→    );
+   875→   875→  }, [authRole, authForm, storedUsers, showToast]);
+   876→   876→
+   877→   877→  /* Login existing user from localStorage */
+   878→   878→  const loginUser = useCallback(() => {
+   879→   879→    const phone = authForm.phone.trim();
+   880→   880→    const found = storedUsers.find((u) => u.phone === phone);
+   881→   881→    if (!found) {
+   882→   882→      setAuthError("No account found with this phone. Please register first.");
+   883→   883→      return;
+   884→   884→    }
+   885→   885→    if (found.password !== authForm.password) {
+   886→   886→      setAuthError("Incorrect password. Please try again.");
+   887→   887→      return;
+   888→   888→    }
+   889→   889→    setCurrentUser(found);
+   890→   890→    saveSession(found);
+   891→   891→    setAuthModal(false);
+   892→   892→    showToast(`Welcome back, ${found.name}!`);
+   893→   893→  }, [authForm, storedUsers, showToast]);
+   894→   894→
+   895→   895→  const submitAuth = useCallback(
+   896→   896→    (e: React.FormEvent) => {
+   897→   897→      e.preventDefault();
+   898→   898→      setAuthError("");
+   899→   899→      if (authMode === "login") loginUser();
+   900→   900→      else registerUser();
+   901→   901→    },
+   902→   902→    [authMode, loginUser, registerUser],
+   903→   903→  );
+   904→   904→
+   905→   905→  const logout = useCallback(() => {
+   906→   906→    setCurrentUser(null);
+   907→   907→    saveSession(null);
+   908→   908→    showToast("Logged out successfully.", "info");
+   909→   909→    goView("home");
+   910→   910→  }, [showToast, goView]);
+   911→   911→
+   912→   912→  /* ---------- Post kaam ---------- */
+   913→   913→  const handlePostKaam = useCallback(
+   914→   914→    (e: React.FormEvent) => {
+   915→   915→      e.preventDefault();
+   916→   916→      if (!currentUser || currentUser.role !== "worker") {
+   917→   917→        showToast("Please create a Worker account first.", "error");
+   918→   918→        openAuth("register");
+   919→   919→        return;
+   920→   920→      }
+   921→   921→      const delivery = Number(postForm.delivery) as 1 | 3 | 7 | 15;
+   922→   922→      const newKaam: Kaam = {
+   923→   923→        id: `k_${Date.now()}`,
+   924→   924→        title: postForm.title.trim(),
+   925→   925→        description: postForm.description.trim(),
+   926→   926→        price: Number(postForm.price),
+   927→   927→        deliveryDays: delivery,
+   928→   928→        category: postForm.category,
+   929→   929→        workerId: currentUser.id,
+   930→   930→        rating: 5,
+   931→   931→        reviews: 0,
+   932→   932→        image: "g1",
+   933→   933→        samples: postSamples.length ? postSamples : undefined,
+   934→   934→      };
+   935→   935→      // add to state + persist to localStorage
+   936→   936→      setKaamsList((prev) => {
+   937→   937→        const next = [newKaam, ...prev];
+   938→   938→        // persist only user-posted kaams (exclude initial seed)
+   939→   939→        const userOnes = next.filter((k) => k.id.startsWith("k_"));
+   940→   940→        saveUserKaams(userOnes);
+   941→   941→        return next;
+   942→   942→      });
+   943→   943→      // bump worker totalKaam
+   944→   944→      setWorkersList((prev) =>
+   945→   945→        prev.map((w) => (w.id === currentUser.id ? { ...w, totalKaam: w.totalKaam + 1 } : w)),
+   946→   946→      );
+   947→   947→      showToast("Kaam posted successfully! It is now live.");
+   948→   948→      setPostForm({ title: "", category: "", price: "", delivery: "3", description: "" });
+   949→   949→      setPostSamples([]);
+   950→   950→      goView("explore");
+   951→   951→    },
+   952→   952→    [currentUser, postForm, postSamples, showToast, openAuth, goView],
+   953→   953→  );
+   954→   954→
+   955→   955→  /* ---------- Image upload handler (FileReader → base64) ---------- */
+   956→   956→  const handleSampleUpload = useCallback(
+   957→   957→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   958→   958→      const files = e.target.files;
+   959→   959→      if (!files || files.length === 0) return;
+   960→   960→      const max = 5;
+   961→   961→      const remaining = max - postSamples.length;
+   962→   962→      if (remaining <= 0) {
+   963→   963→        showToast(`You can upload up to ${max} samples.`, "error");
+   964→   964→        return;
+   965→   965→      }
+   966→   966→      const toRead = Array.from(files).slice(0, remaining);
+   967→   967→      let read = 0;
+   968→   968→      toRead.forEach((file) => {
+   969→   969→        if (!file.type.startsWith("image/")) {
+   970→   970→          showToast("Only image files are allowed.", "error");
+   971→   971→          return;
+   972→   972→        }
+   973→   973→        if (file.size > 2 * 1024 * 1024) {
+   974→   974→          showToast("Image too large (max 2MB).", "error");
+   975→   975→          return;
+   976→   976→        }
+   977→   977→        const reader = new FileReader();
+   978→   978→        reader.onload = () => {
+   979→   979→          const dataUrl = reader.result as string;
+   980→   980→          setPostSamples((prev) => [...prev, dataUrl]);
+   981→   981→          read++;
+   982→   982→          if (read === toRead.length) {
+   983→   983→            showToast(`${read} sample image(s) added.`, "success");
+   984→   984→          }
+   985→   985→        };
+   986→   986→        reader.onerror = () => showToast("Failed to read image.", "error");
+   987→   987→        reader.readAsDataURL(file);
+   988→   988→      });
+   989→   989→      // reset input so same file can be re-selected
+   990→   990→      e.target.value = "";
+   991→   991→    },
+   992→   992→    [postSamples.length, showToast],
+   993→   993→  );
+   994→   994→
+   995→   995→  const removeSample = useCallback((idx: number) => {
+   996→   996→    setPostSamples((prev) => prev.filter((_, i) => i !== idx));
+   997→   997→  }, []);
+   998→   998→
+   999→   999→  /* ---------- Admin actions ---------- */
+  1000→  1000→  const deleteKaam = useCallback(
+  1001→  1001→    (id: string) => {
+  1002→  1002→      setKaamsList((prev) => {
+  1003→  1003→        const next = prev.filter((k) => k.id !== id);
+  1004→  1004→        // sync persisted user kaams
+  1005→  1005→        const userOnes = next.filter((k) => k.id.startsWith("k_"));
+  1006→  1006→        saveUserKaams(userOnes);
+  1007→  1007→        return next;
+  1008→  1008→      });
+  1009→  1009→      showToast("Kaam deleted.", "error");
+  1010→  1010→    },
+  1011→  1011→    [showToast],
+  1012→  1012→  );
+  1013→  1013→
+  1014→  1014→  const deleteUser = useCallback(
+  1015→  1015→    (id: string) => {
+  1016→  1016→      const user = users.find((u) => u.id === id);
+  1017→  1017→      setUsers((prev) => prev.filter((u) => u.id !== id));
+  1018→  1018→      // if a worker is removed, also drop their kaam posts and worker profile (Top Workers, cards)
+  1019→  1019→      if (user?.role === "worker") {
+  1020→  1020→        setKaamsList((prev) => prev.filter((k) => k.workerId !== id));
+  1021→  1021→        setWorkersList((prev) => prev.filter((w) => w.id !== id));
+  1022→  1022→      }
+  1023→  1023→      showToast(`Account deleted — ${user?.name ?? "user"}.`, "error");
+  1024→  1024→    },
+  1025→  1025→    [users, showToast],
+  1026→  1026→  );
+  1027→  1027→
+  1028→  1028→  const deleteWorker = useCallback(
+  1029→  1029→    (id: string) => {
+  1030→  1030→      const w = workersList.find((x) => x.id === id);
+  1031→  1031→      setWorkersList((prev) => {
+  1032→  1032→        const next = prev.filter((x) => x.id !== id);
+  1033→  1033→        saveUserWorkers(next.filter((x) => x.id.startsWith("u_")));
+  1034→  1034→        return next;
+  1035→  1035→      });
+  1036→  1036→      setKaamsList((prev) => {
+  1037→  1037→        const next = prev.filter((k) => k.workerId !== id);
+  1038→  1038→        saveUserKaams(next.filter((k) => k.id.startsWith("k_")));
+  1039→  1039→        return next;
+  1040→  1040→      });
+  1041→  1041→      setUsers((prev) => prev.filter((u) => u.id !== id));
+  1042→  1042→      showToast(`Worker removed — ${w?.name ?? "worker"}.`, "error");
+  1043→  1043→    },
+  1044→  1044→    [workersList, showToast],
+  1045→  1045→  );
+  1046→  1046→
+  1047→  1047→  /* ---------- Admin auth ---------- */
+  1048→  1048→  const adminLogin = useCallback(
+  1049→  1049→    (e: React.FormEvent) => {
+  1050→  1050→      e.preventDefault();
+  1051→  1051→      if (adminPassword === ADMIN_PASSWORD) {
+  1052→  1052→        setAdminAuthed(true);
+  1053→  1053→        setAdminError("");
+  1054→  1054→        setAdminPassword("");
+  1055→  1055→        showToast("Admin access granted.", "success");
+  1056→  1056→      } else {
+  1057→  1057→        setAdminError("Incorrect password. Access denied.");
+  1058→  1058→      }
+  1059→  1059→    },
+  1060→  1060→    [adminPassword, showToast],
+  1061→  1061→  );
+  1062→  1062→
+  1063→  1063→  const adminLogout = useCallback(() => {
+  1064→  1064→    setAdminAuthed(false);
+  1065→  1065→    setAdminPassword("");
+  1066→  1066→    setAdminError("");
+  1067→  1067→    showToast("Admin panel locked.", "info");
+  1068→  1068→  }, [showToast]);
+  1069→  1069→
+  1070→  1070→  /* ---------- Body scroll lock ---------- */
+  1071→  1071→  useEffect(() => {
+  1072→  1072→    const lock = authModal || detailKaam !== null;
+  1073→  1073→    if (lock) {
+  1074→  1074→      const prev = document.body.style.overflow;
+  1075→  1075→      document.body.style.overflow = "hidden";
+  1076→  1076→      return () => {
+  1077→  1077→        document.body.style.overflow = prev;
+  1078→  1078→      };
+  1079→  1079→    }
+  1080→  1080→  }, [authModal, detailKaam]);
+  1081→  1081→
+  1082→  1082→  /* ---------- ESC closes modals ---------- */
+  1083→  1083→  useEffect(() => {
+  1084→  1084→    const onKey = (e: KeyboardEvent) => {
+  1085→  1085→      if (e.key === "Escape") {
+  1086→  1086→        if (detailKaam) setDetailKaam(null);
+  1087→  1087→        else if (authModal) setAuthModal(false);
+  1088→  1088→        else if (profileWorkerId) setProfileWorkerId(null);
+  1089→  1089→      }
+  1090→  1090→    };
+  1091→  1091→    window.addEventListener("keydown", onKey);
+  1092→  1092→    return () => window.removeEventListener("keydown", onKey);
+  1093→  1093→  }, [detailKaam, authModal, profileWorkerId]);
+  1094→  1094→
+  1095→  1095→  const getWorker = useCallback(
+  1096→  1096→    (id: string) => workersList.find((w) => w.id === id),
+  1097→  1097→    [workersList],
+  1098→  1098→  );
+  1099→  1099→  const profileWorker = profileWorkerId ? getWorker(profileWorkerId) : null;
+  1100→  1100→  const detailWorker = detailKaam ? getWorker(detailKaam.workerId) : undefined;
+  1101→  1101→
+  1102→  1102→  /* Admin stats */
+  1103→  1103→  const adminStats = useMemo(
+  1104→  1104→    () => ({
+  1105→  1105→      total: users.length,
+  1106→  1106→      workers: workersList.length,
+  1107→  1107→      viewers: users.filter((u) => u.role === "viewer").length,
+  1108→  1108→      kaam: kaamsList.length,
+  1109→  1109→    }),
+  1110→  1110→    [users, kaamsList, workersList],
+  1111→  1111→  );
+  1112→  1112→
+  1113→  1113→  const filteredAdminUsers = useMemo(() => {
+  1114→  1114→    const q = adminSearch.trim().toLowerCase();
+  1115→  1115→    if (!q) return users;
+  1116→  1116→    return users.filter(
+  1117→  1117→      (u) => u.name.toLowerCase().includes(q) || u.city.toLowerCase().includes(q),
+  1118→  1118→    );
+  1119→  1119→  }, [users, adminSearch]);
+  1120→  1120→
+  1121→  1121→  /* ============================================================
+  1122→  1122→     RENDER
+  1123→  1123→     ============================================================ */
+  1124→  1124→  return (
+  1125→  1125→    <div className="relative flex min-h-screen flex-col bg-slate-950">
+  1126→  1126→      {/* Background grid pattern */}
+  1127→  1127→      <div className="pointer-events-none fixed inset-0 z-0 bg-grid-pattern opacity-[0.15]" />
+  1128→  1128→
+  1129→  1129→      {/* ===== Desktop top navbar ===== */}
+  1130→  1130→      <header className="sticky top-0 z-40 hidden border-b border-white/5 bg-slate-950/80 backdrop-blur-xl md:block">
+  1131→  1131→        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6" aria-label="Primary navigation">
+  1132→  1132→          <BrandMark onClick={() => goView("home")} />
+  1133→  1133→
+  1134→  1134→          <div className="flex items-center gap-1">
+  1135→  1135→            {[
+  1136→  1136→              { id: "home" as ViewId, label: "Home" },
+  1137→  1137→              { id: "explore" as ViewId, label: "Explore Kaam" },
+  1138→  1138→              { id: "workers" as ViewId, label: "Workers" },
+  1139→  1139→            ].map((item) =>
+  1140→  1140→              item.id === "workers" ? (
+  1141→  1141→                <button
+  1142→  1142→                  key={item.id}
+  1143→  1143→                  onClick={() => goView("explore")}
+  1144→  1144→                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+  1145→  1145→                >
+  1146→  1146→                  {item.label}
+  1147→  1147→                </button>
+  1148→  1148→              ) : (
+  1149→  1149→                <button
+  1150→  1150→                  key={item.id}
+  1151→  1151→                  onClick={() => goView(item.id)}
+  1152→  1152→                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+  1153→  1153→                    activeNav === item.id
+  1154→  1154→                      ? "bg-green-500/10 text-green-400"
+  1155→  1155→                      : "text-slate-300 hover:bg-white/5 hover:text-white"
+  1156→  1156→                  }`}
+  1157→  1157→                >
+  1158→  1158→                  {item.label}
+  1159→  1159→                </button>
+  1160→  1160→              ),
+  1161→  1161→            )}
+  1162→  1162→            <button
+  1163→  1163→              onClick={() => goView("home")}
+  1164→  1164→              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+  1165→  1165→            >
+  1166→  1166→              How It Works
+  1167→  1167→            </button>
+  1168→  1168→            <button
+  1169→  1169→              onClick={() => goView("admin")}
+  1170→  1170→              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+  1171→  1171→                activeNav === "admin"
+  1172→  1172→                  ? "bg-amber-500/10 text-amber-400"
+  1173→  1173→                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+  1174→  1174→              }`}
+  1175→  1175→            >
+  1176→  1176→              <iconify-icon icon="mdi:shield-crown" width={16} />
+  1177→  1177→              Admin
+  1178→  1178→            </button>
+  1179→  1179→          </div>
+  1180→  1180→
+  1181→  1181→          <div className="flex items-center gap-2">
+  1182→  1182→            {currentUser ? (
+  1183→  1183→              <button
+  1184→  1184→                onClick={() => goView("profile")}
+  1185→  1185→                className="flex items-center gap-2 rounded-lg border border-white/5 bg-slate-900 px-3 py-2 text-sm transition-colors hover:border-white/15"
+  1186→  1186→              >
+  1187→  1187→                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-green-950">
+  1188→  1188→                  {currentUser.name.charAt(0).toUpperCase()}
+  1189→  1189→                </span>
+  1190→  1190→                <span className="text-slate-200">{currentUser.name}</span>
+  1191→  1191→              </button>
+  1192→  1192→            ) : (
+  1193→  1193→              <button
+  1194→  1194→                onClick={openAuth}
+  1195→  1195→                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+  1196→  1196→              >
+  1197→  1197→                Login
+  1198→  1198→              </button>
+  1199→  1199→            )}
+  1200→  1200→            <button
+  1201→  1201→              onClick={() => (currentUser ? goView("post") : openAuth())}
+  1202→  1202→              className="inline-flex items-center gap-1.5 rounded-lg bg-green-500 px-4 py-2 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
+  1203→  1203→            >
+  1204→  1204→              <iconify-icon icon="mdi:plus" width={16} />
+  1205→  1205→              Post Kaam
+  1206→  1206→            </button>
+  1207→  1207→          </div>
+  1208→  1208→        </nav>
+  1209→  1209→      </header>
+  1210→  1210→
+  1211→  1211→      {/* ===== Mobile top bar ===== */}
+  1212→  1212→      <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl md:hidden">
+  1213→  1213→        <div className="flex h-14 items-center justify-between px-4">
+  1214→  1214→          <BrandMark onClick={() => goView("home")} />
+  1215→  1215→          {currentUser ? (
+  1216→  1216→            <button
+  1217→  1217→              onClick={() => goView("profile")}
+  1218→  1218→              className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-green-950"
+  1219→  1219→            >
+  1220→  1220→              {currentUser.name.charAt(0).toUpperCase()}
+  1221→  1221→            </button>
+  1222→  1222→          ) : (
+  1223→  1223→            <button
+  1224→  1224→              onClick={openAuth}
+  1225→  1225→              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200"
+  1226→  1226→            >
+  1227→  1227→              Create Account
+  1228→  1228→            </button>
+  1229→  1229→          )}
+  1230→  1230→        </div>
+  1231→  1231→      </header>
+  1232→  1232→
+  1233→  1233→      {/* ===== Main content ===== */}
+  1234→  1234→      <main className="relative z-10 flex-1 pb-24 md:pb-10" aria-label="Main content">
+  1235→  1235→        {/* ------------------------------------------------
+  1236→  1236→            VIEW: HOME
+  1237→  1237→            ------------------------------------------------ */}
+  1238→  1238→        {view === "home" && !profileWorker && (
+  1239→  1239→          <div className="mx-auto max-w-7xl px-4 md:px-6">
+  1240→  1240→            {/* Hero */}
+  1241→  1241→            <section className="relative overflow-hidden rounded-3xl border border-white/5 bg-slate-900/40 px-5 py-12 text-center md:px-12 md:py-20">
+  1242→  1242→              {/* green gradient glow */}
+  1243→  1243→              <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-green-500/30 blur-[100px] animate-pulse-glow" />
+  1244→  1244→              <div className="pointer-events-none absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-emerald-600/20 blur-[100px]" />
+  1245→  1245→
+  1246→  1246→              <div className="relative">
+  1247→  1247→                <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+  1248→  1248→                  <iconify-icon icon="mdi:star-four-points" width={14} />
+  1249→  1249→                  Pakistan&apos;s Biggest Local Freelancing Network
+  1250→  1250→                </span>
+  1251→  1251→                <h1 className="mx-auto max-w-3xl text-3xl font-extrabold leading-tight tracking-tight md:text-5xl">
+  1252→  1252→                  Pakistani Talent.{" "}
+  1253→  1253→                  <span className="bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent">
+  1254→  1254→                    World-Class Value.
+  1255→  1255→                  </span>
+  1256→  1256→                </h1>
+  1257→  1257→                <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 md:text-lg">
+  1258→  1258→                  Offer your kaam or find kaam — everything in PKR.
+  1259→  1259→                </p>
+  1260→  1260→                {/* Visually hidden SEO description for crawlers */}
+  1261→  1261→                <p className="sr-only">
+  1262→  1262→                  Hunar.pk is Pakistan&apos;s biggest local freelancing network. Hire talented
+  1263→  1263→                  workers for logo design, website development, video editing, SEO, content
+  1264→  1264→                  writing, social media management, app development and photography. Chat on
+  1265→  1265→                  WhatsApp and pay in PKR with zero commission.
+  1266→  1266→                </p>
+  1267→  1267→
+  1268→  1268→                {/* Search bar */}
+  1269→  1269→                <div className="mx-auto mt-8 flex max-w-2xl items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 shadow-2xl backdrop-blur">
+  1270→  1270→                  <span className="pl-2 text-slate-500">
+  1271→  1271→                    <iconify-icon icon="mdi:magnify" width={22} />
+  1272→  1272→                  </span>
+  1273→  1273→                  <input
+  1274→  1274→                    value={homeSearch}
+  1275→  1275→                    onChange={(e) => setHomeSearch(e.target.value)}
+  1276→  1276→                    onKeyDown={(e) => {
+  1277→  1277→                      if (e.key === "Enter") {
+  1278→  1278→                        setExploreSearch(homeSearch);
+  1279→  1279→                        goView("explore");
+  1280→  1280→                      }
+  1281→  1281→                    }}
+  1282→  1282→                    placeholder="Search kaam... (e.g. logo, website, SEO)"
+  1283→  1283→                    aria-label="Search kaam on Hunar.pk"
+  1284→  1284→                    className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+  1285→  1285→                  />
+  1286→  1286→                  <button
+  1287→  1287→                    onClick={() => {
+  1288→  1288→                      setExploreSearch(homeSearch);
+  1289→  1289→                      goView("explore");
+  1290→  1290→                    }}
+  1291→  1291→                    className="shrink-0 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 md:px-6"
+  1292→  1292→                  >
+  1293→  1293→                    Search
+  1294→  1294→                  </button>
+  1295→  1295→                </div>
+  1296→  1296→
+  1297→  1297→                {/* Stats */}
+  1298→  1298→                <div className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-3">
+  1299→  1299→                  {[
+  1300→  1300→                    { num: "12K+", label: "Workers", icon: "mdi:account-group" },
+  1301→  1301→                    { num: "45K+", label: "Kaam Posted", icon: "mdi:briefcase" },
+  1302→  1302→                    { num: "8.2Cr", label: "PKR Paid Out", icon: "mdi:cash" },
+  1303→  1303→                  ].map((s) => (
+  1304→  1304→                    <div key={s.label} className="rounded-2xl border border-white/5 bg-slate-900/50 px-3 py-4">
+  1305→  1305→                      <iconify-icon icon={s.icon} width={22} class="mx-auto mb-1 text-green-400" />
+  1306→  1306→                      <div className="text-lg font-extrabold text-white md:text-2xl">{s.num}</div>
+  1307→  1307→                      <div className="text-[10px] text-slate-400 md:text-xs">{s.label}</div>
+  1308→  1308→                    </div>
+  1309→  1309→                  ))}
+  1310→  1310→                </div>
+  1311→  1311→              </div>
+  1312→  1312→            </section>
+  1313→  1313→
+  1314→  1314→            {/* Categories */}
+  1315→  1315→            <section className="mt-10">
+  1316→  1316→              <div className="mb-5 flex items-center justify-between">
+  1317→  1317→                <h2 className="text-lg font-bold md:text-2xl">Categories</h2>
+  1318→  1318→                <button
+  1319→  1319→                  onClick={() => goView("explore")}
+  1320→  1320→                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+  1321→  1321→                >
+  1322→  1322→                  View All
+  1323→  1323→                  <iconify-icon icon="mdi:arrow-right" width={16} />
+  1324→  1324→                </button>
+  1325→  1325→              </div>
+  1326→  1326→              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+  1327→  1327→                {CATEGORIES.map((c) => (
+  1328→  1328→                  <button
+  1329→  1329→                    key={c.id}
+  1330→  1330→                    onClick={() => {
+  1331→  1331→                      setExploreCat(c.id);
+  1332→  1332→                      setExploreSearch("");
+  1333→  1333→                      goView("explore");
+  1334→  1334→                    }}
+  1335→  1335→                    className="group flex flex-col items-start rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:border-green-500/40 hover:shadow-[0_0_24px_-4px_rgba(34,197,94,0.35)]"
+  1336→  1336→                  >
+  1337→  1337→                    <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-green-500/10 text-green-400 transition-colors group-hover:bg-green-500/20">
+  1338→  1338→                      <iconify-icon icon={c.icon} width={24} />
+  1339→  1339→                    </span>
+  1340→  1340→                    <h3 className="text-sm font-bold text-white">{c.name}</h3>
+  1341→  1341→                    <p className="text-xs text-slate-500">{c.count}</p>
+  1342→  1342→                  </button>
+  1343→  1343→                ))}
+  1344→  1344→              </div>
+  1345→  1345→            </section>
+  1346→  1346→
+  1347→  1347→            {/* Trending Kaam */}
+  1348→  1348→            <section className="mt-12">
+  1349→  1349→              <div className="mb-5 flex items-center justify-between">
+  1350→  1350→                <h2 className="flex items-center gap-2 text-lg font-bold md:text-2xl">
+  1351→  1351→                  <iconify-icon icon="mdi:fire" width={22} class="text-orange-400" />
+  1352→  1352→                  Trending Kaam
+  1353→  1353→                </h2>
+  1354→  1354→                <button
+  1355→  1355→                  onClick={() => goView("explore")}
+  1356→  1356→                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+  1357→  1357→                >
+  1358→  1358→                  View All
+  1359→  1359→                  <iconify-icon icon="mdi:arrow-right" width={16} />
+  1360→  1360→                </button>
+  1361→  1361→              </div>
+  1362→  1362→              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+  1363→  1363→                {kaamsList.slice(0, 4).map((k) => (
+  1364→  1364→                  <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+  1365→  1365→                ))}
+  1366→  1366→              </div>
+  1367→  1367→            </section>
+  1368→  1368→
+  1369→  1369→            {/* Top Workers */}
+  1370→  1370→            <section className="mt-12">
+  1371→  1371→              <div className="mb-5 flex items-center justify-between">
+  1372→  1372→                <h2 className="flex items-center gap-2 text-lg font-bold md:text-2xl">
+  1373→  1373→                  <iconify-icon icon="mdi:crown" width={22} class="text-amber-400" />
+  1374→  1374→                  Top Workers
+  1375→  1375→                </h2>
+  1376→  1376→                <button
+  1377→  1377→                  onClick={() => goView("explore")}
+  1378→  1378→                  className="flex items-center gap-1 text-xs font-medium text-green-400 hover:text-green-300 md:text-sm"
+  1379→  1379→                >
+  1380→  1380→                  View All
+  1381→  1381→                  <iconify-icon icon="mdi:arrow-right" width={16} />
+  1382→  1382→                </button>
+  1383→  1383→              </div>
+  1384→  1384→              <div className="grid grid-cols-3 gap-3 md:max-w-2xl md:gap-4">
+  1385→  1385→                {workersList.slice(0, 3).map((w) => (
+  1386→  1386→                  <WorkerCard key={w.id} worker={w} onOpen={openWorkerProfile} />
+  1387→  1387→                ))}
+  1388→  1388→              </div>
+  1389→  1389→            </section>
+  1390→  1390→
+  1391→  1391→            {/* How it works */}
+  1392→  1392→            <section className="mt-12 rounded-3xl border border-white/5 bg-slate-900/40 p-6 md:p-10">
+  1393→  1393→              <h2 className="mb-6 text-center text-lg font-bold md:text-2xl">How It Works</h2>
+  1394→  1394→              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+  1395→  1395→                {[
+  1396→  1396→                  { icon: "mdi:magnify", title: "1. Find Kaam", desc: "Browse kaam by category or city to find what you need." },
+  1397→  1397→                  { icon: "mdi:whatsapp", title: "2. Chat on WhatsApp", desc: "Message the worker directly on WhatsApp — no commission." },
+  1398→  1398→                  { icon: "mdi:hand-coin", title: "3. Get It Done", desc: "Pay the worker directly, get your work done, and leave a rating." },
+  1399→  1399→                ].map((s) => (
+  1400→  1400→                  <div key={s.title} className="rounded-2xl border border-white/5 bg-slate-950/40 p-5">
+  1401→  1401→                    <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10 text-green-400">
+  1402→  1402→                      <iconify-icon icon={s.icon} width={26} />
+  1403→  1403→                    </span>
+  1404→  1404→                    <h3 className="mb-1 font-bold text-white">{s.title}</h3>
+  1405→  1405→                    <p className="text-sm text-slate-400">{s.desc}</p>
+  1406→  1406→                  </div>
+  1407→  1407→                ))}
+  1408→  1408→              </div>
+  1409→  1409→            </section>
+  1410→  1410→          </div>
+  1411→  1411→        )}
+  1412→  1412→
+  1413→  1413→        {/* ------------------------------------------------
+  1414→  1414→            VIEW: EXPLORE KAAM
+  1415→  1415→            ------------------------------------------------ */}
+  1416→  1416→        {view === "explore" && !profileWorker && (
+  1417→  1417→          <div className="mx-auto max-w-7xl px-4 md:px-6">
+  1418→  1418→            <div className="py-6">
+  1419→  1419→              <h1 className="mb-1 text-2xl font-extrabold md:text-3xl">Explore Kaam</h1>
+  1420→  1420→              <p className="text-sm text-slate-400">
+  1421→  1421→                Browse kaam from Pakistan&apos;s best workers — all in PKR.
+  1422→  1422→              </p>
+  1423→  1423→
+  1424→  1424→              {/* Search */}
+  1425→  1425→              <div className="mt-5 flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-2">
+  1426→  1426→                <span className="pl-2 text-slate-500">
+  1427→  1427→                  <iconify-icon icon="mdi:magnify" width={20} />
+  1428→  1428→                </span>
+  1429→  1429→                <input
+  1430→  1430→                  value={exploreSearch}
+  1431→  1431→                  onChange={(e) => setExploreSearch(e.target.value)}
+  1432→  1432→                  placeholder="Search kaam..."
+  1433→  1433→                  aria-label="Search kaam listings"
+  1434→  1434→                  className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+  1435→  1435→                />
+  1436→  1436→                {exploreSearch && (
+  1437→  1437→                  <button
+  1438→  1438→                    onClick={() => setExploreSearch("")}
+  1439→  1439→                    className="px-2 text-slate-500 hover:text-white"
+  1440→  1440→                  >
+  1441→  1441→                    <iconify-icon icon="mdi:close" width={18} />
+  1442→  1442→                  </button>
+  1443→  1443→                )}
+  1444→  1444→              </div>
+  1445→  1445→
+  1446→  1446→              {/* Category pills */}
+  1447→  1447→              <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+  1448→  1448→                <button
+  1449→  1449→                  onClick={() => setExploreCat("all")}
+  1450→  1450→                  className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+  1451→  1451→                    exploreCat === "all"
+  1452→  1452→                      ? "border-green-500 bg-green-500 text-green-950"
+  1453→  1453→                      : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+  1454→  1454→                  }`}
+  1455→  1455→                >
+  1456→  1456→                  All
+  1457→  1457→                </button>
+  1458→  1458→                {CATEGORIES.map((c) => (
+  1459→  1459→                  <button
+  1460→  1460→                    key={c.id}
+  1461→  1461→                    onClick={() => setExploreCat(c.id)}
+  1462→  1462→                    className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+  1463→  1463→                      exploreCat === c.id
+  1464→  1464→                        ? "border-green-500 bg-green-500 text-green-950"
+  1465→  1465→                        : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+  1466→  1466→                    }`}
+  1467→  1467→                  >
+  1468→  1468→                    {c.name}
+  1469→  1469→                  </button>
+  1470→  1470→                ))}
+  1471→  1471→              </div>
+  1472→  1472→
+  1473→  1473→              {/* City + Sort */}
+  1474→  1474→              <div className="mt-4 flex flex-wrap items-center gap-3">
+  1475→  1475→                <label className="flex items-center gap-2 text-xs text-slate-400">
+  1476→  1476→                  <iconify-icon icon="mdi:map-marker" width={16} />
+  1477→  1477→                  <select
+  1478→  1478→                    value={exploreCity}
+  1479→  1479→                    onChange={(e) => setExploreCity(e.target.value)}
+  1480→  1480→                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs text-white focus:border-green-500 focus:outline-none"
+  1481→  1481→                  >
+  1482→  1482→                    {CITIES.map((c) => (
+  1483→  1483→                      <option key={c} value={c} className="bg-slate-900">
+  1484→  1484→                        {c}
+  1485→  1485→                      </option>
+  1486→  1486→                    ))}
+  1487→  1487→                  </select>
+  1488→  1488→                </label>
+  1489→  1489→                <label className="flex items-center gap-2 text-xs text-slate-400">
+  1490→  1490→                  <iconify-icon icon="mdi:sort" width={16} />
+  1491→  1491→                  <select
+  1492→  1492→                    value={exploreSort}
+  1493→  1493→                    onChange={(e) => setExploreSort(e.target.value)}
+  1494→  1494→                    className="rounded-lg border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs text-white focus:border-green-500 focus:outline-none"
+  1495→  1495→                  >
+  1496→  1496→                    {SORT_OPTIONS.map((s) => (
+  1497→  1497→                      <option key={s.id} value={s.id} className="bg-slate-900">
+  1498→  1498→                        {s.label}
+  1499→  1499→                      </option>
+  1500→  1500→                    ))}
+  1501→  1501→                  </select>
+  1502→  1502→                </label>
+  1503→  1503→                <span className="ml-auto text-xs text-slate-500">{filteredKaams.length} kaam found</span>
+  1504→  1504→              </div>
+  1505→  1505→
+  1506→  1506→              {/* Grid */}
+  1507→  1507→              {filteredKaams.length === 0 ? (
+  1508→  1508→                <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
+  1509→  1509→                  <iconify-icon icon="mdi:emoticon-sad-outline" width={48} class="text-slate-600" />
+  1510→  1510→                  <p className="mt-3 text-sm font-medium text-slate-300">No kaam found</p>
+  1511→  1511→                  <p className="text-xs text-slate-500">Try changing filters or search.</p>
+  1512→  1512→                </div>
+  1513→  1513→              ) : (
+  1514→  1514→                <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+  1515→  1515→                  {filteredKaams.map((k) => (
+  1516→  1516→                    <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+  1517→  1517→                  ))}
+  1518→  1518→                </div>
+  1519→  1519→              )}
+  1520→  1520→            </div>
+  1521→  1521→          </div>
+  1522→  1522→        )}
+  1523→  1523→
+  1524→  1524→        {/* ------------------------------------------------
+  1525→  1525→            VIEW: POST KAAM
+  1526→  1526→            ------------------------------------------------ */}
+  1527→  1527→        {view === "post" && !profileWorker && (
+  1528→  1528→          <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
+  1529→  1529→            <div className="mb-6">
+  1530→  1530→              <h1 className="text-2xl font-extrabold md:text-3xl">Post Your Kaam</h1>
+  1531→  1531→              <p className="mt-1 text-sm text-slate-400">
+  1532→  1532→                Post your service and let clients contact you directly.
+  1533→  1533→              </p>
+  1534→  1534→            </div>
+  1535→  1535→
+  1536→  1536→            {(!currentUser || currentUser.role !== "worker") && (
+  1537→  1537→              <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+  1538→  1538→                <iconify-icon icon="mdi:alert-circle-outline" width={22} class="shrink-0 text-amber-400" />
+  1539→  1539→                <div className="text-sm">
+  1540→  1540→                  <p className="font-semibold text-amber-300">Worker account required</p>
+  1541→  1541→                  <p className="mt-0.5 text-amber-200/80">
+  1542→  1542→                    You need a Worker account to post kaam. Fill the form below — submitting will remind you.
+  1543→  1543→                  </p>
+  1544→  1544→                  <button
+  1545→  1545→                    onClick={openAuth}
+  1546→  1546→                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-amber-950 hover:bg-amber-400"
+  1547→  1547→                  >
+  1548→  1548→                    <iconify-icon icon="mdi:account-plus" width={14} />
+  1549→  1549→                    Become a Worker
+  1550→  1550→                  </button>
+  1551→  1551→                </div>
+  1552→  1552→              </div>
+  1553→  1553→            )}
+  1554→  1554→
+  1555→  1555→            <form
+  1556→  1556→              onSubmit={handlePostKaam}
+  1557→  1557→              className="space-y-5 rounded-2xl border border-white/5 bg-slate-900/50 p-5 md:p-6"
+  1558→  1558→            >
+  1559→  1559→              {/* Title */}
+  1560→  1560→              <div>
+  1561→  1561→                <label className="mb-1.5 block text-sm font-medium text-slate-300">Kaam Title</label>
+  1562→  1562→                <input
+  1563→  1563→                  required
+  1564→  1564→                  value={postForm.title}
+  1565→  1565→                  onChange={(e) => setPostForm({ ...postForm, title: e.target.value })}
+  1566→  1566→                  placeholder="e.g. Logo design in 24 hours"
+  1567→  1567→                  className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
+  1568→  1568→                />
+  1569→  1569→              </div>
+  1570→  1570→
+  1571→  1571→              {/* Category */}
+  1572→  1572→              <div>
+  1573→  1573→                <label className="mb-1.5 block text-sm font-medium text-slate-300">Category</label>
+  1574→  1574→                <select
+  1575→  1575→                  required
+  1576→  1576→                  value={postForm.category}
+  1577→  1577→                  onChange={(e) => setPostForm({ ...postForm, category: e.target.value })}
+  1578→  1578→                  className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white focus:border-green-500 focus:outline-none"
+  1579→  1579→                >
+  1580→  1580→                  <option value="" className="bg-slate-900">
+  1581→  1581→                    Select category
+  1582→  1582→                  </option>
+  1583→  1583→                  {CATEGORIES.map((c) => (
+  1584→  1584→                    <option key={c.id} value={c.id} className="bg-slate-900">
+  1585→  1585→                      {c.name}
+  1586→  1586→                    </option>
+  1587→  1587→                  ))}
+  1588→  1588→                </select>
+  1589→  1589→              </div>
+  1590→  1590→
+  1591→  1591→              {/* Price + Delivery */}
+  1592→  1592→              <div className="grid grid-cols-2 gap-4">
+  1593→  1593→                <div>
+  1594→  1594→                  <label className="mb-1.5 block text-sm font-medium text-slate-300">Price (PKR)</label>
+  1595→  1595→                  <div className="flex items-center rounded-xl border border-white/10 bg-slate-950/60 px-3 focus-within:border-green-500">
+  1596→  1596→                    <span className="text-sm text-slate-500">Rs.</span>
+  1597→  1597→                    <input
+  1598→  1598→                      required
+  1599→  1599→                      type="number"
+  1600→  1600→                      min="100"
+  1601→  1601→                      value={postForm.price}
+  1602→  1602→                      onChange={(e) => setPostForm({ ...postForm, price: e.target.value })}
+  1603→  1603→                      placeholder="5000"
+  1604→  1604→                      className="w-full bg-transparent px-2 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+  1605→  1605→                    />
+  1606→  1606→                  </div>
+  1607→  1607→                </div>
+  1608→  1608→                <div>
+  1609→  1609→                  <label className="mb-1.5 block text-sm font-medium text-slate-300">Delivery Time</label>
+  1610→  1610→                  <select
+  1611→  1611→                    required
+  1612→  1612→                    value={postForm.delivery}
+  1613→  1613→                    onChange={(e) => setPostForm({ ...postForm, delivery: e.target.value })}
+  1614→  1614→                    className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white focus:border-green-500 focus:outline-none"
+  1615→  1615→                  >
+  1616→  1616→                    <option value="1" className="bg-slate-900">
+  1617→  1617→                      1 day
+  1618→  1618→                    </option>
+  1619→  1619→                    <option value="3" className="bg-slate-900">
+  1620→  1620→                      3 days
+  1621→  1621→                    </option>
+  1622→  1622→                    <option value="7" className="bg-slate-900">
+  1623→  1623→                      7 days
+  1624→  1624→                    </option>
+  1625→  1625→                    <option value="15" className="bg-slate-900">
+  1626→  1626→                      15 days
+  1627→  1627→                    </option>
+  1628→  1628→                  </select>
+  1629→  1629→                </div>
+  1630→  1630→              </div>
+  1631→  1631→
+  1632→  1632→              {/* Description */}
+  1633→  1633→              <div>
+  1634→  1634→                <label className="mb-1.5 block text-sm font-medium text-slate-300">Description</label>
+  1635→  1635→                <textarea
+  1636→  1636→                  required
+  1637→  1637→                  value={postForm.description}
+  1638→  1638→                  onChange={(e) => setPostForm({ ...postForm, description: e.target.value })}
+  1639→  1639→                  rows={4}
+  1640→  1640→                  placeholder="Describe your kaam... what's included, revisions, etc."
+  1641→  1641→                  className="w-full resize-none rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
+  1642→  1642→                />
+  1643→  1643→              </div>
+  1644→  1644→
+  1645→  1645→              {/* Samples (real image upload) */}
+  1646→  1646→              <div>
+  1647→  1647→                <label className="mb-1.5 block text-sm font-medium text-slate-300">
+  1648→  1648→                  Upload Sample Images
+  1649→  1649→                  <span className="ml-2 text-xs font-normal text-slate-500">
+  1650→  1650→                    ({postSamples.length}/5)
+  1651→  1651→                  </span>
+  1652→  1652→                </label>
+  1653→  1653→
+  1654→  1654→                {postSamples.length > 0 && (
+  1655→  1655→                  <div className="mb-3 grid grid-cols-3 gap-2">
+  1656→  1656→                    {postSamples.map((src, i) => (
+  1657→  1657→                      <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-white/10">
+  1658→  1658→                        <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover" />
+  1659→  1659→                        <button
+  1660→  1660→                          type="button"
+  1661→  1661→                          onClick={() => removeSample(i)}
+  1662→  1662→                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+  1663→  1663→                          aria-label="Remove sample"
+  1664→  1664→                        >
+  1665→  1665→                          <iconify-icon icon="mdi:close" width={14} />
+  1666→  1666→                        </button>
+  1667→  1667→                      </div>
+  1668→  1668→                    ))}
+  1669→  1669→                  </div>
+  1670→  1670→                )}
+  1671→  1671→
+  1672→  1672→                {postSamples.length < 5 && (
+  1673→  1673→                  <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-slate-950/40 py-8 text-center transition-colors hover:border-green-500/40">
+  1674→  1674→                    <iconify-icon icon="mdi:cloud-upload-outline" width={36} class="text-slate-500" />
+  1675→  1675→                    <span className="mt-2 text-sm font-medium text-slate-300">
+  1676→  1676→                      Upload your work samples
+  1677→  1677→                    </span>
+  1678→  1678→                    <span className="mt-0.5 text-xs text-slate-500">
+  1679→  1679→                      PNG, JPG (max 2MB each, up to 5)
+  1680→  1680→                    </span>
+  1681→  1681→                    <input
+  1682→  1682→                      type="file"
+  1683→  1683→                      accept="image/*"
+  1684→  1684→                      multiple
+  1685→  1685→                      onChange={handleSampleUpload}
+  1686→  1686→                      className="hidden"
+  1687→  1687→                      aria-label="Upload sample images"
+  1688→  1688→                    />
+  1689→  1689→                  </label>
+  1690→  1690→                )}
+  1691→  1691→              </div>
+  1692→  1692→
+  1693→  1693→              <button
+  1694→  1694→                type="submit"
+  1695→  1695→                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
+  1696→  1696→              >
+  1697→  1697→                <iconify-icon icon="mdi:rocket-launch" width={18} />
+  1698→  1698→                Post Kaam
+  1699→  1699→              </button>
+  1700→  1700→            </form>
+  1701→  1701→          </div>
+  1702→  1702→        )}
+  1703→  1703→
+  1704→  1704→        {/* ------------------------------------------------
+  1705→  1705→            VIEW: PROFILE
+  1706→  1706→            ------------------------------------------------ */}
+  1707→  1707→        {view === "profile" && !profileWorker && (
+  1708→  1708→          <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
+  1709→  1709→            <h1 className="mb-6 text-2xl font-extrabold md:text-3xl">Profile</h1>
+  1710→  1710→
+  1711→  1711→            {currentUser ? (
+  1712→  1712→              <div className="space-y-4">
+  1713→  1713→                <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-6">
+  1714→  1714→                  <div className="pointer-events-none absolute -top-16 -right-10 h-40 w-40 rounded-full bg-green-500/20 blur-[70px]" />
+  1715→  1715→                  <div className="relative flex items-center gap-4">
+  1716→  1716→                    <span
+  1717→  1717→                      className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${avatarGradient(currentUser.name)} text-2xl font-bold text-white`}
+  1718→  1718→                    >
+  1719→  1719→                      {currentUser.name.charAt(0).toUpperCase()}
+  1720→  1720→                    </span>
+  1721→  1721→                    <div>
+  1722→  1722→                      <h2 className="text-xl font-bold text-white">{currentUser.name}</h2>
+  1723→  1723→                      <span
+  1724→  1724→                        className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${ROLE_STYLES[currentUser.role].badge}`}
+  1725→  1725→                      >
+  1726→  1726→                        <iconify-icon icon={ROLE_STYLES[currentUser.role].icon} width={14} />
+  1727→  1727→                        {ROLE_STYLES[currentUser.role].label}
+  1728→  1728→                      </span>
+  1729→  1729→                    </div>
+  1730→  1730→                  </div>
+  1731→  1731→                </div>
+  1732→  1732→
+  1733→  1733→                <div className="grid grid-cols-2 gap-3">
+  1734→  1734→                  <button
+  1735→  1735→                    onClick={() => goView("post")}
+  1736→  1736→                    className="flex items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-left transition-colors hover:border-green-500/40"
+  1737→  1737→                  >
+  1738→  1738→                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-400">
+  1739→  1739→                      <iconify-icon icon="mdi:plus-circle" width={22} />
+  1740→  1740→                    </span>
+  1741→  1741→                    <span>
+  1742→  1742→                      <span className="block text-sm font-bold text-white">Post a Kaam</span>
+  1743→  1743→                      <span className="block text-xs text-slate-400">Offer a new service</span>
+  1744→  1744→                    </span>
+  1745→  1745→                  </button>
+  1746→  1746→                  <button
+  1747→  1747→                    onClick={() => goView("explore")}
+  1748→  1748→                    className="flex items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-left transition-colors hover:border-green-500/40"
+  1749→  1749→                  >
+  1750→  1750→                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+  1751→  1751→                      <iconify-icon icon="mdi:compass" width={22} />
+  1752→  1752→                    </span>
+  1753→  1753→                    <span>
+  1754→  1754→                      <span className="block text-sm font-bold text-white">Explore Kaam</span>
+  1755→  1755→                      <span className="block text-xs text-slate-400">Browse services</span>
+  1756→  1756→                    </span>
+  1757→  1757→                  </button>
+  1758→  1758→                </div>
+  1759→  1759→
+  1760→  1760→                <button
+  1761→  1761→                  onClick={() => goView("admin")}
+  1762→  1762→                  className="flex w-full items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left transition-colors hover:border-amber-500/40"
+  1763→  1763→                >
+  1764→  1764→                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+  1765→  1765→                    <iconify-icon icon="mdi:shield-crown" width={22} />
+  1766→  1766→                  </span>
+  1767→  1767→                  <span>
+  1768→  1768→                    <span className="block text-sm font-bold text-white">Admin Panel</span>
+  1769→  1769→                    <span className="block text-xs text-slate-400">Manage accounts & kaam posts</span>
+  1770→  1770→                  </span>
+  1771→  1771→                  <iconify-icon icon="mdi:chevron-right" width={20} class="ml-auto text-slate-500" />
+  1772→  1772→                </button>
+  1773→  1773→
+  1774→  1774→                <button
+  1775→  1775→                  onClick={logout}
+  1776→  1776→                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/5 px-6 py-3 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/10"
+  1777→  1777→                >
+  1778→  1778→                  <iconify-icon icon="mdi:logout" width={18} />
+  1779→  1779→                  Logout
+  1780→  1780→                </button>
+  1781→  1781→              </div>
+  1782→  1782→            ) : (
+  1783→  1783→              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
+  1784→  1784→                <span className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10 text-green-400">
+  1785→  1785→                  <iconify-icon icon="mdi:account-circle-outline" width={40} />
+  1786→  1786→                </span>
+  1787→  1787→                <h2 className="text-lg font-bold text-white">You&apos;re not logged in</h2>
+  1788→  1788→                <p className="mt-1 max-w-xs text-sm text-slate-400">
+  1789→  1789→                  Create an account to post kaam or save your favorite workers.
+  1790→  1790→                </p>
+  1791→  1791→                <button
+  1792→  1792→                  onClick={openAuth}
+  1793→  1793→                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-green-500 px-6 py-2.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
+  1794→  1794→                >
+  1795→  1795→                  <iconify-icon icon="mdi:account-plus" width={18} />
+  1796→  1796→                  Create Account
+  1797→  1797→                </button>
+  1798→  1798→              </div>
+  1799→  1799→            )}
+  1800→  1800→          </div>
+  1801→  1801→        )}
+  1802→  1802→
+  1803→  1803→        {/* ------------------------------------------------
+  1804→  1804→            VIEW: ADMIN PANEL
+  1805→  1805→            ------------------------------------------------ */}
+  1806→  1806→        {view === "admin" && !profileWorker && (
+  1807→  1807→          <div className="mx-auto max-w-5xl px-4 py-6 md:px-6">
+  1808→  1808→            <div className="mb-6 flex items-center gap-3">
+  1809→  1809→              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400">
+  1810→  1810→                <iconify-icon icon="mdi:shield-crown" width={26} />
+  1811→  1811→              </span>
+  1812→  1812→              <div className="flex-1">
+  1813→  1813→                <h1 className="text-2xl font-extrabold md:text-3xl">Admin Panel</h1>
+  1814→  1814→                <p className="text-sm text-slate-400">Manage accounts, workers & kaam posts.</p>
+  1815→  1815→              </div>
+  1816→  1816→              {adminAuthed && (
+  1817→  1817→                <button
+  1818→  1818→                  onClick={adminLogout}
+  1819→  1819→                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-amber-500/40 hover:text-amber-400"
+  1820→  1820→                  title="Lock admin panel"
+  1821→  1821→                >
+  1822→  1822→                  <iconify-icon icon="mdi:lock" width={16} />
+  1823→  1823→                  <span className="hidden sm:inline">Lock</span>
+  1824→  1824→                </button>
+  1825→  1825→              )}
+  1826→  1826→            </div>
+  1827→  1827→
+  1828→  1828→            {!adminAuthed ? (
+  1829→  1829→              <div className="mx-auto max-w-md rounded-3xl border border-white/5 bg-slate-900/50 p-6 text-center md:p-8">
+  1830→  1830→                <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400">
+  1831→  1831→                  <iconify-icon icon="mdi:lock" width={32} />
+  1832→  1832→                </span>
+  1833→  1833→                <h2 className="text-lg font-bold text-white">Admin Access Required</h2>
+  1834→  1834→                <p className="mt-1 text-sm text-slate-400">
+  1835→  1835→                  Enter the admin password to manage accounts, workers and kaam posts.
+  1836→  1836→                </p>
+  1837→  1837→                <form onSubmit={adminLogin} className="mt-5 space-y-3 text-left">
+  1838→  1838→                  <div>
+  1839→  1839→                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Password</label>
+  1840→  1840→                    <input
+  1841→  1841→                      type="password"
+  1842→  1842→                      value={adminPassword}
+  1843→  1843→                      onChange={(e) => {
+  1844→  1844→                        setAdminPassword(e.target.value);
+  1845→  1845→                        setAdminError("");
+  1846→  1846→                      }}
+  1847→  1847→                      placeholder="Enter admin password"
+  1848→  1848→                      autoFocus
+  1849→  1849→                      aria-label="Admin password"
+  1850→  1850→                      className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:outline-none"
+  1851→  1851→                    />
+  1852→  1852→                  </div>
+  1853→  1853→                  {adminError && (
+  1854→  1854→                    <p className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+  1855→  1855→                      <iconify-icon icon="mdi:alert-circle-outline" width={14} />
+  1856→  1856→                      {adminError}
+  1857→  1857→                    </p>
+  1858→  1858→                  )}
+  1859→  1859→                  <button
+  1860→  1860→                    type="submit"
+  1861→  1861→                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-amber-950 transition-colors hover:bg-amber-400"
+  1862→  1862→                  >
+  1863→  1863→                    <iconify-icon icon="mdi:lock-open" width={18} />
+  1864→  1864→                    Unlock Admin Panel
+  1865→  1865→                  </button>
+  1866→  1866→                </form>
+  1867→  1867→                <button
+  1868→  1868→                  onClick={() => goView("home")}
+  1869→  1869→                  className="mt-3 text-xs text-slate-500 hover:text-slate-300"
+  1870→  1870→                >
+  1871→  1871→                  ← Back to home
+  1872→  1872→                </button>
+  1873→  1873→              </div>
+  1874→  1874→            ) : (
+  1875→  1875→              <>
+  1876→  1876→            {/* Stats */}
+  1877→  1877→            <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+  1878→  1878→              {[
+  1879→  1879→                { num: adminStats.total, label: "Total Users", icon: "mdi:account-group", tone: "text-sky-400" },
+  1880→  1880→                { num: adminStats.workers, label: "Workers", icon: "mdi:briefcase", tone: "text-green-400" },
+  1881→  1881→                { num: adminStats.viewers, label: "Viewers", icon: "mdi:account-search", tone: "text-violet-400" },
+  1882→  1882→                { num: adminStats.kaam, label: "Kaam Posts", icon: "mdi:file-multiple", tone: "text-amber-400" },
+  1883→  1883→              ].map((s) => (
+  1884→  1884→                <div key={s.label} className="rounded-2xl border border-white/5 bg-slate-900/50 p-4">
+  1885→  1885→                  <iconify-icon icon={s.icon} width={22} class={`${s.tone} mb-1`} />
+  1886→  1886→                  <div className="text-2xl font-extrabold text-white">{s.num}</div>
+  1887→  1887→                  <div className="text-xs text-slate-400">{s.label}</div>
+  1888→  1888→                </div>
+  1889→  1889→              ))}
+  1890→  1890→            </div>
+  1891→  1891→
+  1892→  1892→            {/* Tabs */}
+  1893→  1893→            <div className="mb-5 flex gap-2">
+  1894→  1894→              <button
+  1895→  1895→                onClick={() => setAdminTab("users")}
+  1896→  1896→                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+  1897→  1897→                  adminTab === "users"
+  1898→  1898→                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+  1899→  1899→                    : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+  1900→  1900→                }`}
+  1901→  1901→              >
+  1902→  1902→                <iconify-icon icon="mdi:account-group" width={16} class="mr-1.5 align-middle" />
+  1903→  1903→                Users
+  1904→  1904→              </button>
+  1905→  1905→              <button
+  1906→  1906→                onClick={() => setAdminTab("workers")}
+  1907→  1907→                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+  1908→  1908→                  adminTab === "workers"
+  1909→  1909→                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+  1910→  1910→                    : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+  1911→  1911→                }`}
+  1912→  1912→              >
+  1913→  1913→                <iconify-icon icon="mdi:account-tie" width={16} class="mr-1.5 align-middle" />
+  1914→  1914→                Workers
+  1915→  1915→              </button>
+  1916→  1916→              <button
+  1917→  1917→                onClick={() => setAdminTab("kaam")}
+  1918→  1918→                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+  1919→  1919→                  adminTab === "kaam"
+  1920→  1920→                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+  1921→  1921→                    : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+  1922→  1922→                }`}
+  1923→  1923→              >
+  1924→  1924→                <iconify-icon icon="mdi:file-multiple" width={16} class="mr-1.5 align-middle" />
+  1925→  1925→                Kaam Posts
+  1926→  1926→              </button>
+  1927→  1927→            </div>
+  1928→  1928→
+  1929→  1929→            {/* Users management */}
+  1930→  1930→            {adminTab === "users" && (
+  1931→  1931→              <div>
+  1932→  1932→                <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 p-2">
+  1933→  1933→                  <span className="pl-2 text-slate-500">
+  1934→  1934→                    <iconify-icon icon="mdi:magnify" width={18} />
+  1935→  1935→                  </span>
+  1936→  1936→                  <input
+  1937→  1937→                    value={adminSearch}
+  1938→  1938→                    onChange={(e) => setAdminSearch(e.target.value)}
+  1939→  1939→                    placeholder="Search by name or city..."
+  1940→  1940→                    aria-label="Search users in admin panel"
+  1941→  1941→                    className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+  1942→  1942→                  />
+  1943→  1943→                </div>
+  1944→  1944→
+  1945→  1945→                {filteredAdminUsers.length === 0 ? (
+  1946→  1946→                  <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-slate-400">
+  1947→  1947→                    No users found.
+  1948→  1948→                  </div>
+  1949→  1949→                ) : (
+  1950→  1950→                  <div className="hunar-scroll max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+  1951→  1951→                    {filteredAdminUsers.map((u) => (
+  1952→  1952→                      <div
+  1953→  1953→                        key={u.id}
+  1954→  1954→                        className="flex items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/50 p-3"
+  1955→  1955→                      >
+  1956→  1956→                        <span
+  1957→  1957→                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${avatarGradient(u.name)} text-sm font-bold text-white`}
+  1958→  1958→                        >
+  1959→  1959→                          {u.name.charAt(0).toUpperCase()}
+  1960→  1960→                        </span>
+  1961→  1961→                        <div className="min-w-0 flex-1">
+  1962→  1962→                          <p className="truncate text-sm font-bold text-white">{u.name}</p>
+  1963→  1963→                          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-400">
+  1964→  1964→                            <span className="flex items-center gap-0.5">
+  1965→  1965→                              <iconify-icon icon="mdi:map-marker" width={11} />
+  1966→  1966→                              {u.city}
+  1967→  1967→                            </span>
+  1968→  1968→                            <span className="text-slate-600">·</span>
+  1969→  1969→                            <span className="flex items-center gap-0.5">
+  1970→  1970→                              <iconify-icon icon="mdi:phone" width={11} />
+  1971→  1971→                              +{u.phone}
+  1972→  1972→                            </span>
+  1973→  1973→                            {u.level && (
+  1974→  1974→                              <>
+  1975→  1975→                                <span className="text-slate-600">·</span>
+  1976→  1976→                                <span>{u.level}</span>
+  1977→  1977→                              </>
+  1978→  1978→                            )}
+  1979→  1979→                          </p>
+  1980→  1980→                        </div>
+  1981→  1981→                        <span
+  1982→  1982→                          className={`hidden shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-flex ${ROLE_STYLES[u.role].badge}`}
+  1983→  1983→                        >
+  1984→  1984→                          <iconify-icon icon={ROLE_STYLES[u.role].icon} width={12} />
+  1985→  1985→                          {ROLE_STYLES[u.role].label}
+  1986→  1986→                        </span>
+  1987→  1987→                        <button
+  1988→  1988→                          onClick={() => deleteUser(u.id)}
+  1989→  1989→                          disabled={u.role === "admin"}
+  1990→  1990→                          className="flex shrink-0 items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-30"
+  1991→  1991→                          title={u.role === "admin" ? "Admin accounts cannot be deleted" : "Delete account"}
+  1992→  1992→                        >
+  1993→  1993→                          <iconify-icon icon="mdi:trash-can-outline" width={14} />
+  1994→  1994→                          <span className="hidden sm:inline">Delete</span>
+  1995→  1995→                        </button>
+  1996→  1996→                      </div>
+  1997→  1997→                    ))}
+  1998→  1998→                  </div>
+  1999→  1999→                )}
+  2000→  2000→              </div>
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]
