@@ -37,6 +37,7 @@ interface Kaam {
   rating: number;
   reviews: number;
   image: string; // gradient key
+  samples?: string[]; // uploaded sample images as base64 data URLs
 }
 
 interface Category {
@@ -54,6 +55,11 @@ interface UserAccount {
   phone: string;
   level?: WorkerLevel;
   joined: string;
+}
+
+/* Stored auth user (includes password for login check) */
+interface StoredUser extends UserAccount {
+  password: string;
 }
 
 type ViewId = "home" | "explore" | "post" | "profile" | "admin";
@@ -384,6 +390,82 @@ const ROLE_STYLES: Record<UserRole, { badge: string; label: string; icon: string
 /* Admin access password (demo) */
 const ADMIN_PASSWORD = "BA56CR7VK18";
 
+/* ---------- localStorage keys (persist auth + user-posted kaam, survives export) ---------- */
+const LS_USERS = "hunar_users_db";
+const LS_SESSION = "hunar_session";
+const LS_KAAMS = "hunar_user_kaams";
+const LS_WORKERS = "hunar_user_workers";
+
+function loadStoredUsers(): StoredUser[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_USERS);
+    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveStoredUsers(list: StoredUser[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_USERS, JSON.stringify(list));
+  } catch {
+    /* ignore quota */
+  }
+}
+function loadSession(): StoredUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LS_SESSION);
+    return raw ? (JSON.parse(raw) as StoredUser) : null;
+  } catch {
+    return null;
+  }
+}
+function saveSession(u: StoredUser | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (u) window.localStorage.setItem(LS_SESSION, JSON.stringify(u));
+    else window.localStorage.removeItem(LS_SESSION);
+  } catch {
+    /* ignore */
+  }
+}
+function loadUserKaams(): Kaam[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_KAAMS);
+    return raw ? (JSON.parse(raw) as Kaam[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveUserKaams(list: Kaam[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_KAAMS, JSON.stringify(list));
+  } catch {
+    /* ignore quota */
+  }
+}
+function loadUserWorkers(): Worker[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_WORKERS);
+    return raw ? (JSON.parse(raw) as Worker[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveUserWorkers(list: Worker[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_WORKERS, JSON.stringify(list));
+  } catch {
+    /* ignore quota */
+  }
+}
+
 /* ---------- Helpers ---------- */
 function formatPKR(n: number): string {
   return "Rs. " + n.toLocaleString("en-PK");
@@ -599,12 +681,13 @@ export default function Home() {
 
   // auth
   const [authModal, setAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"register" | "login">("register");
   const [authStep, setAuthStep] = useState<"role" | "form">("role");
   const [authRole, setAuthRole] = useState<"worker" | "viewer" | null>(null);
-  const [currentUser, setCurrentUser] = useState<{
-    name: string;
-    role: UserRole;
-  } | null>(null);
+  const [authError, setAuthError] = useState("");
+  const [authForm, setAuthForm] = useState({ name: "", phone: "", city: "", password: "" });
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const [storedUsers, setStoredUsers] = useState<StoredUser[]>([]);
 
   // kaam detail modal
   const [detailKaam, setDetailKaam] = useState<Kaam | null>(null);
@@ -632,6 +715,7 @@ export default function Home() {
     delivery: "3",
     description: "",
   });
+  const [postSamples, setPostSamples] = useState<string[]>([]); // base64 data URLs
 
   // admin: state-backed users + kaams so they can be deleted
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
@@ -699,25 +783,128 @@ export default function Home() {
     [],
   );
 
+  /* ---------- Mount: load persisted auth + user kaams + user workers from localStorage ---------- */
+  useEffect(() => {
+    const su = loadStoredUsers();
+    setStoredUsers(su);
+    const session = loadSession();
+    if (session) setCurrentUser(session);
+    const userKaams = loadUserKaams();
+    if (userKaams.length) setKaamsList((prev) => [...userKaams, ...prev]);
+    const userWorkers = loadUserWorkers();
+    if (userWorkers.length) setWorkersList((prev) => [...prev, ...userWorkers]);
+  }, []);
+
   /* ---------- Auth modal ---------- */
-  const openAuth = useCallback(() => {
-    setAuthStep("role");
+  const openAuth = useCallback((mode: "register" | "login" = "register") => {
+    const m = mode === "login" ? "login" : "register";
+    setAuthMode(m);
+    setAuthStep(m === "login" ? "form" : "role");
     setAuthRole(null);
+    setAuthError("");
+    setAuthForm({ name: "", phone: "", city: "", password: "" });
     setAuthModal(true);
   }, []);
 
-  const submitAuth = useCallback(() => {
-    setCurrentUser({ name: authRole === "admin" ? "Admin" : "User", role: authRole ?? "viewer" });
+  /* Register a new worker/viewer into localStorage */
+  const registerUser = useCallback(() => {
+    if (!authRole) return;
+    const phone = authForm.phone.trim();
+    if (phone.length < 7) {
+      setAuthError("Please enter a valid phone number.");
+      return;
+    }
+    if (authForm.password.length < 4) {
+      setAuthError("Password must be at least 4 characters.");
+      return;
+    }
+    // duplicate phone check
+    if (storedUsers.some((u) => u.phone === phone)) {
+      setAuthError("An account with this phone already exists. Please login.");
+      return;
+    }
+    const newUser: StoredUser = {
+      id: `u_${Date.now()}`,
+      name: authForm.name.trim() || "User",
+      role: authRole,
+      city: authForm.city || "Karachi",
+      phone,
+      level: authRole === "worker" ? "New" : undefined,
+      joined: new Date().getFullYear().toString(),
+      password: authForm.password,
+    };
+    const next = [...storedUsers, newUser];
+    setStoredUsers(next);
+    saveStoredUsers(next);
+    setCurrentUser(newUser);
+    saveSession(newUser);
+    // also reflect in admin user list
+    setUsers((prev) => [
+      ...prev,
+      { id: newUser.id, name: newUser.name, role: newUser.role, city: newUser.city, phone: newUser.phone, level: newUser.level, joined: newUser.joined },
+    ]);
+    // if worker, also create a worker profile so they show on cards/profile
+    if (newUser.role === "worker") {
+      const newWorker: Worker = {
+        id: newUser.id,
+        name: newUser.name,
+        city: newUser.city,
+        level: "New",
+        rating: 0,
+        totalKaam: 0,
+        repeatClients: 0,
+        gradient: avatarGradient(newUser.name),
+        initials: newUser.name.charAt(0).toUpperCase() + (newUser.name.split(" ")[1]?.charAt(0)?.toUpperCase() ?? ""),
+        phone: newUser.phone,
+        bio: "New worker on Hunar.pk.",
+        portfolio: ["g1", "g2", "g3", "g4"],
+      };
+      setWorkersList((prev) => {
+        const next = [...prev, newWorker];
+        // persist user-created workers (exclude seed WORKERS)
+        saveUserWorkers(next.filter((w) => w.id.startsWith("u_")));
+        return next;
+      });
+    }
     setAuthModal(false);
     showToast(
       authRole === "worker"
         ? "Worker account created! You can post kaam now."
         : "Welcome! Find kaam and chat with workers on WhatsApp.",
     );
-  }, [authRole, showToast]);
+  }, [authRole, authForm, storedUsers, showToast]);
+
+  /* Login existing user from localStorage */
+  const loginUser = useCallback(() => {
+    const phone = authForm.phone.trim();
+    const found = storedUsers.find((u) => u.phone === phone);
+    if (!found) {
+      setAuthError("No account found with this phone. Please register first.");
+      return;
+    }
+    if (found.password !== authForm.password) {
+      setAuthError("Incorrect password. Please try again.");
+      return;
+    }
+    setCurrentUser(found);
+    saveSession(found);
+    setAuthModal(false);
+    showToast(`Welcome back, ${found.name}!`);
+  }, [authForm, storedUsers, showToast]);
+
+  const submitAuth = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      setAuthError("");
+      if (authMode === "login") loginUser();
+      else registerUser();
+    },
+    [authMode, loginUser, registerUser],
+  );
 
   const logout = useCallback(() => {
     setCurrentUser(null);
+    saveSession(null);
     showToast("Logged out successfully.", "info");
     goView("home");
   }, [showToast, goView]);
@@ -728,20 +915,97 @@ export default function Home() {
       e.preventDefault();
       if (!currentUser || currentUser.role !== "worker") {
         showToast("Please create a Worker account first.", "error");
-        openAuth();
+        openAuth("register");
         return;
       }
-      showToast("Kaam posted! It will appear after review.");
+      const delivery = Number(postForm.delivery) as 1 | 3 | 7 | 15;
+      const newKaam: Kaam = {
+        id: `k_${Date.now()}`,
+        title: postForm.title.trim(),
+        description: postForm.description.trim(),
+        price: Number(postForm.price),
+        deliveryDays: delivery,
+        category: postForm.category,
+        workerId: currentUser.id,
+        rating: 5,
+        reviews: 0,
+        image: "g1",
+        samples: postSamples.length ? postSamples : undefined,
+      };
+      // add to state + persist to localStorage
+      setKaamsList((prev) => {
+        const next = [newKaam, ...prev];
+        // persist only user-posted kaams (exclude initial seed)
+        const userOnes = next.filter((k) => k.id.startsWith("k_"));
+        saveUserKaams(userOnes);
+        return next;
+      });
+      // bump worker totalKaam
+      setWorkersList((prev) =>
+        prev.map((w) => (w.id === currentUser.id ? { ...w, totalKaam: w.totalKaam + 1 } : w)),
+      );
+      showToast("Kaam posted successfully! It is now live.");
       setPostForm({ title: "", category: "", price: "", delivery: "3", description: "" });
+      setPostSamples([]);
       goView("explore");
     },
-    [currentUser, showToast, openAuth, goView],
+    [currentUser, postForm, postSamples, showToast, openAuth, goView],
   );
+
+  /* ---------- Image upload handler (FileReader → base64) ---------- */
+  const handleSampleUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      const max = 5;
+      const remaining = max - postSamples.length;
+      if (remaining <= 0) {
+        showToast(`You can upload up to ${max} samples.`, "error");
+        return;
+      }
+      const toRead = Array.from(files).slice(0, remaining);
+      let read = 0;
+      toRead.forEach((file) => {
+        if (!file.type.startsWith("image/")) {
+          showToast("Only image files are allowed.", "error");
+          return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+          showToast("Image too large (max 2MB).", "error");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          setPostSamples((prev) => [...prev, dataUrl]);
+          read++;
+          if (read === toRead.length) {
+            showToast(`${read} sample image(s) added.`, "success");
+          }
+        };
+        reader.onerror = () => showToast("Failed to read image.", "error");
+        reader.readAsDataURL(file);
+      });
+      // reset input so same file can be re-selected
+      e.target.value = "";
+    },
+    [postSamples.length, showToast],
+  );
+
+  const removeSample = useCallback((idx: number) => {
+    setPostSamples((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
 
   /* ---------- Admin actions ---------- */
   const deleteKaam = useCallback(
     (id: string) => {
-      setKaamsList((prev) => prev.filter((k) => k.id !== id));
+      setKaamsList((prev) => {
+        const next = prev.filter((k) => k.id !== id);
+        // sync persisted user kaams
+        const userOnes = next.filter((k) => k.id.startsWith("k_"));
+        saveUserKaams(userOnes);
+        return next;
+      });
       showToast("Kaam deleted.", "error");
     },
     [showToast],
@@ -764,8 +1028,16 @@ export default function Home() {
   const deleteWorker = useCallback(
     (id: string) => {
       const w = workersList.find((x) => x.id === id);
-      setWorkersList((prev) => prev.filter((x) => x.id !== id));
-      setKaamsList((prev) => prev.filter((k) => k.workerId !== id));
+      setWorkersList((prev) => {
+        const next = prev.filter((x) => x.id !== id);
+        saveUserWorkers(next.filter((x) => x.id.startsWith("u_")));
+        return next;
+      });
+      setKaamsList((prev) => {
+        const next = prev.filter((k) => k.workerId !== id);
+        saveUserKaams(next.filter((k) => k.id.startsWith("k_")));
+        return next;
+      });
       setUsers((prev) => prev.filter((u) => u.id !== id));
       showToast(`Worker removed — ${w?.name ?? "worker"}.`, "error");
     },
@@ -1370,18 +1642,52 @@ export default function Home() {
                 />
               </div>
 
-              {/* Samples (fake file input) */}
+              {/* Samples (real image upload) */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">Upload Samples</label>
-                <button
-                  type="button"
-                  onClick={() => showToast("This is a demo — file upload is not active.", "info")}
-                  className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-slate-950/40 py-8 text-center transition-colors hover:border-green-500/40"
-                >
-                  <iconify-icon icon="mdi:cloud-upload-outline" width={36} class="text-slate-500" />
-                  <span className="mt-2 text-sm font-medium text-slate-300">Upload your samples here</span>
-                  <span className="mt-0.5 text-xs text-slate-500">PNG, JPG, PDF (max 10MB)</span>
-                </button>
+                <label className="mb-1.5 block text-sm font-medium text-slate-300">
+                  Upload Sample Images
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    ({postSamples.length}/5)
+                  </span>
+                </label>
+
+                {postSamples.length > 0 && (
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {postSamples.map((src, i) => (
+                      <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-white/10">
+                        <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeSample(i)}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-label="Remove sample"
+                        >
+                          <iconify-icon icon="mdi:close" width={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {postSamples.length < 5 && (
+                  <label className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-slate-950/40 py-8 text-center transition-colors hover:border-green-500/40">
+                    <iconify-icon icon="mdi:cloud-upload-outline" width={36} class="text-slate-500" />
+                    <span className="mt-2 text-sm font-medium text-slate-300">
+                      Upload your work samples
+                    </span>
+                    <span className="mt-0.5 text-xs text-slate-500">
+                      PNG, JPG (max 2MB each, up to 5)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleSampleUpload}
+                      className="hidden"
+                      aria-label="Upload sample images"
+                    />
+                  </label>
+                )}
               </div>
 
               <button
@@ -1975,11 +2281,52 @@ export default function Home() {
 
             <div className="mb-5 text-center">
               <Logo size={56} />
-              <h2 className="mt-3 text-xl font-extrabold">Create Account</h2>
-              <p className="mt-1 text-sm text-slate-400">Welcome to Hunar.pk. Choose your role.</p>
+              <h2 className="mt-3 text-xl font-extrabold">
+                {authMode === "login" ? "Welcome Back" : "Create Account"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                {authMode === "login"
+                  ? "Login to your Hunar.pk account."
+                  : "Join Hunar.pk. Choose your role."}
+              </p>
             </div>
 
-            {authStep === "role" ? (
+            {/* Login / Register toggle */}
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-slate-950/60 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("register");
+                  setAuthStep("role");
+                  setAuthError("");
+                }}
+                className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+                  authMode === "register"
+                    ? "bg-green-500 text-green-950"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                Register
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthStep("form");
+                  setAuthError("");
+                }}
+                className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+                  authMode === "login"
+                    ? "bg-green-500 text-green-950"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                Login
+              </button>
+            </div>
+
+            {/* REGISTER: role selection step */}
+            {authMode === "register" && authStep === "role" ? (
               <div className="space-y-3">
                 <button
                   onClick={() => {
@@ -2021,82 +2368,133 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitAuth();
-                }}
-                className="space-y-4"
-              >
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-xs">
-                  <iconify-icon
-                    icon={authRole === "worker" ? "mdi:briefcase" : "mdi:account-search"}
-                    width={16}
-                    class="text-green-400"
-                  />
-                  <span className="text-slate-300">
-                    Role:{" "}
-                    <span className="font-semibold text-white">
-                      {authRole === "worker" ? "Worker" : "Viewer"}
+              <form onSubmit={submitAuth} className="space-y-4">
+                {/* role badge (register only) */}
+                {authMode === "register" && (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-xs">
+                    <iconify-icon
+                      icon={authRole === "worker" ? "mdi:briefcase" : "mdi:account-search"}
+                      width={16}
+                      class="text-green-400"
+                    />
+                    <span className="text-slate-300">
+                      Role:{" "}
+                      <span className="font-semibold text-white">
+                        {authRole === "worker" ? "Worker" : "Viewer"}
+                      </span>
                     </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAuthStep("role")}
-                    className="ml-auto text-green-400 hover:text-green-300"
-                  >
-                    Change
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setAuthStep("role")}
+                      className="ml-auto text-green-400 hover:text-green-300"
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-300">Name</label>
-                  <input
-                    required
-                    placeholder="Your name"
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
-                  />
-                </div>
+                {authMode === "register" && (
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Name</label>
+                    <input
+                      required
+                      value={authForm.name}
+                      onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+                      placeholder="Your name"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-300">Phone</label>
                   <input
                     required
                     type="tel"
+                    value={authForm.phone}
+                    onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
                     placeholder="03XX XXXXXXX"
                     className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
                   />
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-300">City</label>
-                  <select
-                    required
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white focus:border-green-500 focus:outline-none"
-                  >
-                    <option value="" className="bg-slate-900">
-                      Select city
-                    </option>
-                    {CITIES.filter((c) => c !== "All Cities").map((c) => (
-                      <option key={c} value={c} className="bg-slate-900">
-                        {c}
+                {authMode === "register" && (
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-300">City</label>
+                    <select
+                      required
+                      value={authForm.city}
+                      onChange={(e) => setAuthForm({ ...authForm, city: e.target.value })}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white focus:border-green-500 focus:outline-none"
+                    >
+                      <option value="" className="bg-slate-900">
+                        Select city
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {CITIES.filter((c) => c !== "All Cities").map((c) => (
+                        <option key={c} value={c} className="bg-slate-900">
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-300">Password</label>
                   <input
                     required
                     type="password"
+                    value={authForm.password}
+                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
                     placeholder="••••••••"
                     className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-green-500 focus:outline-none"
                   />
                 </div>
+
+                {authError && (
+                  <p className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                    <iconify-icon icon="mdi:alert-circle-outline" width={14} />
+                    {authError}
+                  </p>
+                )}
+
                 <button
                   type="submit"
                   className="w-full rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
                 >
-                  Create Account
+                  {authMode === "login" ? "Login" : "Create Account"}
                 </button>
+
+                <p className="text-center text-xs text-slate-500">
+                  {authMode === "login" ? (
+                    <>
+                      No account?{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode("register");
+                          setAuthStep("role");
+                          setAuthError("");
+                        }}
+                        className="font-semibold text-green-400 hover:text-green-300"
+                      >
+                        Register here
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode("login");
+                          setAuthStep("form");
+                          setAuthError("");
+                        }}
+                        className="font-semibold text-green-400 hover:text-green-300"
+                      >
+                        Login here
+                      </button>
+                    </>
+                  )}
+                </p>
               </form>
             )}
           </div>
@@ -2266,13 +2664,23 @@ function KaamDetailModal({
           {/* Sample images */}
           <div className="mt-5">
             <h3 className="mb-2 text-sm font-bold text-white">Samples</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {[kaam.image, "g2", "g3"].map((g, i) => (
-                <div key={i} className="aspect-video overflow-hidden rounded-lg border border-white/5">
-                  <GradientImage gKey={g} icon={cat?.icon} className="h-full w-full" />
-                </div>
-              ))}
-            </div>
+            {kaam.samples && kaam.samples.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {kaam.samples.map((src, i) => (
+                  <div key={i} className="aspect-video overflow-hidden rounded-lg border border-white/5">
+                    <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {[kaam.image, "g2", "g3"].map((g, i) => (
+                  <div key={i} className="aspect-video overflow-hidden rounded-lg border border-white/5">
+                    <GradientImage gKey={g} icon={cat?.icon} className="h-full w-full" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* CTA */}
