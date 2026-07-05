@@ -61,7 +61,7 @@ interface UserAccount {
   joined: string;
 }
 
-type ViewId = "home" | "explore" | "post" | "profile" | "admin";
+type ViewId = "home" | "explore" | "post" | "profile" | "admin" | "workers";
 
 /* ---------- Static data ---------- */
 const CATEGORIES: Category[] = [
@@ -137,7 +137,7 @@ const ROLE_STYLES: Record<UserRole, { badge: string; label: string; icon: string
 /* ---------- API helpers ---------- */
 async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "same-origin" });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({})).error) || `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) ).error || `Request failed (${res.status})`);
   return res.json() as Promise<T>;
 }
 async function apiSend<T>(method: "POST" | "DELETE", url: string, body?: unknown): Promise<T> {
@@ -973,7 +973,7 @@ export default function Home() {
               </button>
             ) : (
               <button
-                onClick={openAuth}
+                onClick={() => openAuth()}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
               >
                 Login
@@ -1004,7 +1004,7 @@ export default function Home() {
             </button>
           ) : (
             <button
-              onClick={openAuth}
+              onClick={() => openAuth()}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200"
             >
               Create Account
@@ -1331,7 +1331,7 @@ export default function Home() {
                     You need a Worker account to post kaam. Fill the form below — submitting will remind you.
                   </p>
                   <button
-                    onClick={openAuth}
+                    onClick={() => openAuth()}
                     className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-amber-950 hover:bg-amber-400"
                   >
                     <iconify-icon icon="mdi:account-plus" width={14} />
@@ -1648,7 +1648,7 @@ export default function Home() {
                   Create an account to post kaam or save your favorite workers.
                 </p>
                 <button
-                  onClick={openAuth}
+                  onClick={() => openAuth()}
                   className="mt-5 inline-flex items-center gap-2 rounded-xl bg-green-500 px-6 py-2.5 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
                 >
                   <iconify-icon icon="mdi:account-plus" width={18} />
