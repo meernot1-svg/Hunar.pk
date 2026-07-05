@@ -381,6 +381,9 @@ const ROLE_STYLES: Record<UserRole, { badge: string; label: string; icon: string
   admin: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", label: "Admin", icon: "mdi:shield-crown" },
 };
 
+/* Admin access password (demo) */
+const ADMIN_PASSWORD = "BA56CR7VK18";
+
 /* ---------- Helpers ---------- */
 function formatPKR(n: number): string {
   return "Rs. " + n.toLocaleString("en-PK");
@@ -395,10 +398,6 @@ function waLink(phone: string, kaamTitle?: string): string {
     ? `Assalam o Alaikum! I saw your kaam on Hunar.pk — "${kaamTitle}". Let's discuss the details.`
     : "Assalam o Alaikum! I saw your profile on Hunar.pk. I'd like to hire you for some kaam.";
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-}
-
-function workerById(id: string): Worker | undefined {
-  return WORKERS.find((w) => w.id === id);
 }
 
 function avatarGradient(name: string): string {
@@ -481,14 +480,15 @@ function GradientImage({
 
 function KaamCard({
   kaam,
+  worker,
   onOpen,
   onWorker,
 }: {
   kaam: Kaam;
+  worker?: Worker;
   onOpen: (k: Kaam) => void;
   onWorker: (id: string) => void;
 }) {
-  const worker = workerById(kaam.workerId);
   if (!worker) return null;
   const cat = CATEGORIES.find((c) => c.id === kaam.category);
 
@@ -636,8 +636,16 @@ export default function Home() {
   // admin: state-backed users + kaams so they can be deleted
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
   const [kaamsList, setKaamsList] = useState<Kaam[]>(INITIAL_KAAMS);
-  const [adminTab, setAdminTab] = useState<"users" | "kaam">("users");
+  const [adminTab, setAdminTab] = useState<"users" | "workers" | "kaam">("users");
   const [adminSearch, setAdminSearch] = useState("");
+
+  // workers are state-backed so admin deletions reflect everywhere (Top Workers, cards, profiles)
+  const [workersList, setWorkersList] = useState<Worker[]>(WORKERS);
+
+  // admin auth
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
 
   /* ---------- Derived: filtered kaams for explore ---------- */
   const filteredKaams = useMemo(() => {
@@ -647,7 +655,7 @@ export default function Home() {
     }
     if (exploreCity !== "All Cities") {
       list = list.filter((k) => {
-        const w = workerById(k.workerId);
+        const w = workersList.find((x) => x.id === k.workerId);
         return w?.city === exploreCity;
       });
     }
@@ -662,7 +670,7 @@ export default function Home() {
     if (exploreSort === "price-low") list.sort((a, b) => a.price - b.price);
     else if (exploreSort === "price-high") list.sort((a, b) => b.price - a.price);
     return list;
-  }, [kaamsList, exploreCat, exploreCity, exploreSearch, exploreSort]);
+  }, [kaamsList, workersList, exploreCat, exploreCity, exploreSearch, exploreSort]);
 
   /* ---------- Navigation ---------- */
   const goView = useCallback((v: ViewId) => {
@@ -743,14 +751,49 @@ export default function Home() {
     (id: string) => {
       const user = users.find((u) => u.id === id);
       setUsers((prev) => prev.filter((u) => u.id !== id));
-      // if a worker is removed, also drop their kaam posts
+      // if a worker is removed, also drop their kaam posts and worker profile (Top Workers, cards)
       if (user?.role === "worker") {
         setKaamsList((prev) => prev.filter((k) => k.workerId !== id));
+        setWorkersList((prev) => prev.filter((w) => w.id !== id));
       }
       showToast(`Account deleted — ${user?.name ?? "user"}.`, "error");
     },
     [users, showToast],
   );
+
+  const deleteWorker = useCallback(
+    (id: string) => {
+      const w = workersList.find((x) => x.id === id);
+      setWorkersList((prev) => prev.filter((x) => x.id !== id));
+      setKaamsList((prev) => prev.filter((k) => k.workerId !== id));
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      showToast(`Worker removed — ${w?.name ?? "worker"}.`, "error");
+    },
+    [workersList, showToast],
+  );
+
+  /* ---------- Admin auth ---------- */
+  const adminLogin = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (adminPassword === ADMIN_PASSWORD) {
+        setAdminAuthed(true);
+        setAdminError("");
+        setAdminPassword("");
+        showToast("Admin access granted.", "success");
+      } else {
+        setAdminError("Incorrect password. Access denied.");
+      }
+    },
+    [adminPassword, showToast],
+  );
+
+  const adminLogout = useCallback(() => {
+    setAdminAuthed(false);
+    setAdminPassword("");
+    setAdminError("");
+    showToast("Admin panel locked.", "info");
+  }, [showToast]);
 
   /* ---------- Body scroll lock ---------- */
   useEffect(() => {
@@ -777,17 +820,22 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [detailKaam, authModal, profileWorkerId]);
 
-  const profileWorker = profileWorkerId ? workerById(profileWorkerId) : null;
+  const getWorker = useCallback(
+    (id: string) => workersList.find((w) => w.id === id),
+    [workersList],
+  );
+  const profileWorker = profileWorkerId ? getWorker(profileWorkerId) : null;
+  const detailWorker = detailKaam ? getWorker(detailKaam.workerId) : undefined;
 
   /* Admin stats */
   const adminStats = useMemo(
     () => ({
       total: users.length,
-      workers: users.filter((u) => u.role === "worker").length,
+      workers: workersList.length,
       viewers: users.filter((u) => u.role === "viewer").length,
       kaam: kaamsList.length,
     }),
-    [users, kaamsList],
+    [users, kaamsList, workersList],
   );
 
   const filteredAdminUsers = useMemo(() => {
@@ -1041,7 +1089,7 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 {kaamsList.slice(0, 4).map((k) => (
-                  <KaamCard key={k.id} kaam={k} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                  <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                 ))}
               </div>
             </section>
@@ -1062,7 +1110,7 @@ export default function Home() {
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-3 md:max-w-2xl md:gap-4">
-                {WORKERS.slice(0, 3).map((w) => (
+                {workersList.slice(0, 3).map((w) => (
                   <WorkerCard key={w.id} worker={w} onOpen={openWorkerProfile} />
                 ))}
               </div>
@@ -1193,7 +1241,7 @@ export default function Home() {
               ) : (
                 <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
                   {filteredKaams.map((k) => (
-                    <KaamCard key={k.id} kaam={k} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                    <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                   ))}
                 </div>
               )}
@@ -1455,12 +1503,70 @@ export default function Home() {
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400">
                 <iconify-icon icon="mdi:shield-crown" width={26} />
               </span>
-              <div>
+              <div className="flex-1">
                 <h1 className="text-2xl font-extrabold md:text-3xl">Admin Panel</h1>
-                <p className="text-sm text-slate-400">Manage accounts and kaam posts.</p>
+                <p className="text-sm text-slate-400">Manage accounts, workers & kaam posts.</p>
               </div>
+              {adminAuthed && (
+                <button
+                  onClick={adminLogout}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-amber-500/40 hover:text-amber-400"
+                  title="Lock admin panel"
+                >
+                  <iconify-icon icon="mdi:lock" width={16} />
+                  <span className="hidden sm:inline">Lock</span>
+                </button>
+              )}
             </div>
 
+            {!adminAuthed ? (
+              <div className="mx-auto max-w-md rounded-3xl border border-white/5 bg-slate-900/50 p-6 text-center md:p-8">
+                <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400">
+                  <iconify-icon icon="mdi:lock" width={32} />
+                </span>
+                <h2 className="text-lg font-bold text-white">Admin Access Required</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Enter the admin password to manage accounts, workers and kaam posts.
+                </p>
+                <form onSubmit={adminLogin} className="mt-5 space-y-3 text-left">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Password</label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => {
+                        setAdminPassword(e.target.value);
+                        setAdminError("");
+                      }}
+                      placeholder="Enter admin password"
+                      autoFocus
+                      aria-label="Admin password"
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:outline-none"
+                    />
+                  </div>
+                  {adminError && (
+                    <p className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                      <iconify-icon icon="mdi:alert-circle-outline" width={14} />
+                      {adminError}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-amber-950 transition-colors hover:bg-amber-400"
+                  >
+                    <iconify-icon icon="mdi:lock-open" width={18} />
+                    Unlock Admin Panel
+                  </button>
+                </form>
+                <button
+                  onClick={() => goView("home")}
+                  className="mt-3 text-xs text-slate-500 hover:text-slate-300"
+                >
+                  ← Back to home
+                </button>
+              </div>
+            ) : (
+              <>
             {/* Stats */}
             <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
               {[
@@ -1489,6 +1595,17 @@ export default function Home() {
               >
                 <iconify-icon icon="mdi:account-group" width={16} class="mr-1.5 align-middle" />
                 Users
+              </button>
+              <button
+                onClick={() => setAdminTab("workers")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  adminTab === "workers"
+                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                    : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-white/20"
+                }`}
+              >
+                <iconify-icon icon="mdi:account-tie" width={16} class="mr-1.5 align-middle" />
+                Workers
               </button>
               <button
                 onClick={() => setAdminTab("kaam")}
@@ -1577,6 +1694,58 @@ export default function Home() {
               </div>
             )}
 
+            {/* Workers management */}
+            {adminTab === "workers" && (
+              <div>
+                {workersList.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-slate-400">
+                    No workers found.
+                  </div>
+                ) : (
+                  <div className="hunar-scroll max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+                    {workersList.map((w) => (
+                      <div
+                        key={w.id}
+                        className="flex items-center gap-3 rounded-2xl border border-white/5 bg-slate-900/50 p-3"
+                      >
+                        <span
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${w.gradient} text-xs font-bold text-white`}
+                        >
+                          {w.initials}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-white">{w.name}</p>
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-400">
+                            <span className="flex items-center gap-0.5">
+                              <iconify-icon icon="mdi:map-marker" width={11} />
+                              {w.city}
+                            </span>
+                            <span className="text-slate-600">·</span>
+                            <Stars rating={w.rating} size={11} />
+                            <span className="text-slate-300">{w.rating}</span>
+                            <span className="text-slate-600">·</span>
+                            <span>{w.totalKaam} Kaam</span>
+                          </p>
+                        </div>
+                        <span
+                          className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-block ${LEVEL_STYLES[w.level].badge}`}
+                        >
+                          {w.level}
+                        </span>
+                        <button
+                          onClick={() => deleteWorker(w.id)}
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20"
+                        >
+                          <iconify-icon icon="mdi:trash-can-outline" width={14} />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Kaam posts management */}
             {adminTab === "kaam" && (
               <div>
@@ -1587,7 +1756,7 @@ export default function Home() {
                 ) : (
                   <div className="hunar-scroll max-h-[60vh] space-y-2 overflow-y-auto pr-1">
                     {kaamsList.map((k) => {
-                      const w = workerById(k.workerId);
+                      const w = getWorker(k.workerId);
                       const cat = CATEGORIES.find((c) => c.id === k.category);
                       return (
                         <div
@@ -1620,6 +1789,8 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            )}
+            </>
             )}
           </div>
         )}
@@ -1713,7 +1884,7 @@ export default function Home() {
                 {kaamsList
                   .filter((k) => k.workerId === profileWorker.id)
                   .map((k) => (
-                    <KaamCard key={k.id} kaam={k} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                    <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                   ))}
                 {kaamsList.filter((k) => k.workerId === profileWorker.id).length === 0 && (
                   <p className="col-span-full text-sm text-slate-400">This worker has no other kaam yet.</p>
@@ -1933,9 +2104,10 @@ export default function Home() {
       )}
 
       {/* ===== Kaam Detail Modal ===== */}
-      {detailKaam && (
+      {detailKaam && detailWorker && (
         <KaamDetailModal
           kaam={detailKaam}
+          worker={detailWorker}
           onClose={() => setDetailKaam(null)}
           onWorker={openWorkerProfile}
         />
@@ -1991,16 +2163,16 @@ export default function Home() {
    ============================================================ */
 function KaamDetailModal({
   kaam,
+  worker,
   onClose,
   onWorker,
 }: {
   kaam: Kaam;
+  worker: Worker;
   onClose: () => void;
   onWorker: (id: string) => void;
 }) {
-  const worker = workerById(kaam.workerId);
   const cat = CATEGORIES.find((c) => c.id === kaam.category);
-  if (!worker) return null;
 
   return (
     <div
