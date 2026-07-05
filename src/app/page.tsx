@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 /* ============================================================
-   HUNAR.PK — Pakistan's first local freelancing network
+   HUNAR.PK — Pakistan's biggest local freelancing network
    Single-page client app. No "Gig" word — only "Kaam".
    ============================================================ */
 
@@ -808,7 +808,7 @@ export default function Home() {
 
       {/* ===== Desktop top navbar ===== */}
       <header className="sticky top-0 z-40 hidden border-b border-white/5 bg-slate-950/80 backdrop-blur-xl md:block">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6" aria-label="Primary navigation">
           <BrandMark onClick={() => goView("home")} />
 
           <div className="flex items-center gap-1">
@@ -911,7 +911,7 @@ export default function Home() {
       </header>
 
       {/* ===== Main content ===== */}
-      <main className="relative z-10 flex-1 pb-24 md:pb-10">
+      <main className="relative z-10 flex-1 pb-24 md:pb-10" aria-label="Main content">
         {/* ------------------------------------------------
             VIEW: HOME
             ------------------------------------------------ */}
@@ -926,7 +926,7 @@ export default function Home() {
               <div className="relative">
                 <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
                   <iconify-icon icon="mdi:star-four-points" width={14} />
-                  Pakistan&apos;s first local freelancing network
+                  Pakistan&apos;s Biggest Local Freelancing Network
                 </span>
                 <h1 className="mx-auto max-w-3xl text-3xl font-extrabold leading-tight tracking-tight md:text-5xl">
                   Pakistani Talent.{" "}
@@ -936,6 +936,13 @@ export default function Home() {
                 </h1>
                 <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 md:text-lg">
                   Offer your kaam or find kaam — everything in PKR.
+                </p>
+                {/* Visually hidden SEO description for crawlers */}
+                <p className="sr-only">
+                  Hunar.pk is Pakistan&apos;s biggest local freelancing network. Hire talented
+                  workers for logo design, website development, video editing, SEO, content
+                  writing, social media management, app development and photography. Chat on
+                  WhatsApp and pay in PKR with zero commission.
                 </p>
 
                 {/* Search bar */}
@@ -953,6 +960,7 @@ export default function Home() {
                       }
                     }}
                     placeholder="Search kaam... (e.g. logo, website, SEO)"
+                    aria-label="Search kaam on Hunar.pk"
                     className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                   />
                   <button
@@ -1102,6 +1110,7 @@ export default function Home() {
                   value={exploreSearch}
                   onChange={(e) => setExploreSearch(e.target.value)}
                   placeholder="Search kaam..."
+                  aria-label="Search kaam listings"
                   className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                 />
                 {exploreSearch && (
@@ -1505,6 +1514,7 @@ export default function Home() {
                     value={adminSearch}
                     onChange={(e) => setAdminSearch(e.target.value)}
                     placeholder="Search by name or city..."
+                    aria-label="Search users in admin panel"
                     className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                   />
                 </div>
@@ -1746,7 +1756,7 @@ export default function Home() {
       </footer>
 
       {/* ===== Mobile bottom nav ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-slate-950/95 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-slate-950/95 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
         <div className="grid grid-cols-4">
           {[
             { id: "home" as ViewId, label: "Home", icon: "mdi:home" },
