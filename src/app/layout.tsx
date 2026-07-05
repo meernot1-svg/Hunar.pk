@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
@@ -10,10 +10,17 @@ const inter = Inter({
   display: "swap",
 });
 
+const sora = Sora({
+  variable: "--font-sora",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Hunar.pk — Pakistani Talent. Duniya Ki Keemat.",
+  title: "Hunar.pk — Pakistani Talent. World-Class Value.",
   description:
-    "Pakistan ka pehla local freelancing network. Kaam dhundho ya apna kaam post karein — sab kuch PKR mein. Logo Design, Website, Video Editing, SEO aur bohot kuch.",
+    "Pakistan's first local freelancing network. Find kaam or post your services — all in PKR. Logo Design, Website, Video Editing, SEO and more.",
   keywords: [
     "Hunar.pk",
     "Pakistan freelancing",
@@ -25,12 +32,12 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Hunar.pk" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/hunar-logo.svg",
   },
   openGraph: {
-    title: "Hunar.pk — Pakistani Talent. Duniya Ki Keemat.",
+    title: "Hunar.pk — Pakistani Talent. World-Class Value.",
     description:
-      "Pakistan ka pehla local freelancing network. Kaam dhundho ya apna kaam post karein — sab kuch PKR mein.",
+      "Pakistan's first local freelancing network. Find kaam or post your services — all in PKR.",
     siteName: "Hunar.pk",
     type: "website",
   },
@@ -50,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} antialiased bg-slate-950 text-white selection:bg-green-500/30`}
+        className={`${inter.variable} ${sora.variable} antialiased bg-slate-950 text-white selection:bg-green-500/30`}
       >
         {children}
         <Toaster />
