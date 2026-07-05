@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error("[login] error:", e);
-    return NextResponse.json({ error: "Login failed. Please try again." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Login failed. Please try again.", detail: msg }, { status: 500 });
   }
 }

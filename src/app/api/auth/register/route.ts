@@ -68,7 +68,8 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error("[register] error:", e);
-    return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Registration failed. Please try again.", detail: msg }, { status: 500 });
   }
 }
 
