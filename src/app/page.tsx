@@ -4,26 +4,28 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 /* ============================================================
    HUNAR.PK — Pakistan's biggest local freelancing network
-   Single-page client app. No "Gig" word — only "Kaam".
+   Database-backed: all data flows through API routes.
+   No "Gig" word — only "Kaam".
    ============================================================ */
 
-/* ---------- Types ---------- */
+/* ---------- Types (mirror src/lib/types.ts) ---------- */
 type WorkerLevel = "New" | "Rising" | "Top";
 type UserRole = "worker" | "viewer" | "admin";
 
 interface Worker {
   id: string;
+  userId?: string;
   name: string;
   city: string;
   level: WorkerLevel;
   rating: number;
   totalKaam: number;
   repeatClients: number;
-  gradient: string; // tailwind gradient classes for avatar
+  gradient: string;
   initials: string;
-  phone: string; // 92XXXXXXXXXX
+  phone: string;
   bio: string;
-  portfolio: string[]; // gradient keys
+  portfolio: string[];
 }
 
 interface Kaam {
@@ -32,13 +34,14 @@ interface Kaam {
   description: string;
   price: number;
   deliveryDays: 1 | 3 | 7 | 15;
-  category: string; // category id
+  category: string;
   workerId: string;
   rating: number;
   reviews: number;
-  image: string; // gradient key (fallback)
-  thumbnail?: string; // uploaded thumbnail (base64 data URL) — main image shown on cards
-  samples?: string[]; // uploaded sample images as base64 data URLs
+  image: string;
+  thumbnail?: string | null;
+  samples?: string[] | null;
+  worker?: Worker | null; // joined on list endpoints
 }
 
 interface Category {
@@ -54,13 +57,8 @@ interface UserAccount {
   role: UserRole;
   city: string;
   phone: string;
-  level?: WorkerLevel;
+  level?: WorkerLevel | null;
   joined: string;
-}
-
-/* Stored auth user (includes password for login check) */
-interface StoredUser extends UserAccount {
-  password: string;
 }
 
 type ViewId = "home" | "explore" | "post" | "profile" | "admin";
@@ -94,258 +92,6 @@ const SORT_OPTIONS = [
   { id: "price-high", label: "Price: High to Low" },
 ];
 
-const WORKERS: Worker[] = [
-  {
-    id: "w1",
-    name: "Ahmed Raza",
-    city: "Karachi",
-    level: "Top",
-    rating: 4.9,
-    totalKaam: 214,
-    repeatClients: 78,
-    gradient: "from-emerald-500 to-teal-600",
-    initials: "AR",
-    phone: "923001234567",
-    bio: "5 years of experience in logo and brand identity design. Studied graphic design at Karachi University.",
-    portfolio: ["g1", "g2", "g3", "g4", "g5", "g6"],
-  },
-  {
-    id: "w2",
-    name: "Fatima Khan",
-    city: "Lahore",
-    level: "Rising",
-    rating: 4.8,
-    totalKaam: 96,
-    repeatClients: 41,
-    gradient: "from-pink-500 to-rose-600",
-    initials: "FK",
-    phone: "923011234568",
-    bio: "WordPress developer and SEO specialist. Based in Lahore, built 200+ websites.",
-    portfolio: ["g2", "g4", "g1", "g6", "g3", "g5"],
-  },
-  {
-    id: "w3",
-    name: "Hassan Ali",
-    city: "Islamabad",
-    level: "Top",
-    rating: 5.0,
-    totalKaam: 188,
-    repeatClients: 92,
-    gradient: "from-sky-500 to-indigo-600",
-    initials: "HA",
-    phone: "923021234569",
-    bio: "YouTube video editor and color grading expert. 4K editing, fast delivery guaranteed.",
-    portfolio: ["g3", "g1", "g5", "g2", "g4", "g6"],
-  },
-  {
-    id: "w4",
-    name: "Ayesha Siddiqui",
-    city: "Rawalpindi",
-    level: "Rising",
-    rating: 4.7,
-    totalKaam: 73,
-    repeatClients: 35,
-    gradient: "from-violet-500 to-purple-600",
-    initials: "AS",
-    phone: "923031234570",
-    bio: "Urdu and English content writer. Blogs, articles, and website copy.",
-    portfolio: ["g4", "g6", "g2", "g1", "g5", "g3"],
-  },
-  {
-    id: "w5",
-    name: "Ali Hamza",
-    city: "Faisalabad",
-    level: "New",
-    rating: 4.6,
-    totalKaam: 24,
-    repeatClients: 8,
-    gradient: "from-amber-500 to-orange-600",
-    initials: "AH",
-    phone: "923041234571",
-    bio: "Social media manager and Facebook ads expert. New but results guaranteed.",
-    portfolio: ["g5", "g3", "g1", "g6", "g2", "g4"],
-  },
-  {
-    id: "w6",
-    name: "Zainab Malik",
-    city: "Multan",
-    level: "Top",
-    rating: 4.9,
-    totalKaam: 152,
-    repeatClients: 64,
-    gradient: "from-cyan-500 to-blue-600",
-    initials: "ZM",
-    phone: "923051234572",
-    bio: "Mobile app developer (Flutter + React Native). 50+ apps live on Play Store.",
-    portfolio: ["g6", "g2", "g4", "g3", "g1", "g5"],
-  },
-];
-
-const INITIAL_KAAMS: Kaam[] = [
-  {
-    id: "k1",
-    title: "Logo design 24 ghante mein",
-    description: "Professional logo design with 3 concepts, unlimited revisions aur source files.",
-    price: 2500,
-    deliveryDays: 1,
-    category: "logo",
-    workerId: "w1",
-    rating: 4.9,
-    reviews: 127,
-    image: "g1",
-  },
-  {
-    id: "k2",
-    title: "WordPress website banayen",
-    description: "Complete responsive WordPress website with premium theme aur SEO setup.",
-    price: 18000,
-    deliveryDays: 7,
-    category: "web",
-    workerId: "w2",
-    rating: 4.8,
-    reviews: 64,
-    image: "g2",
-  },
-  {
-    id: "k3",
-    title: "YouTube video edit karunga",
-    description: "Professional video editing with color grading, transitions aur sound design.",
-    price: 5000,
-    deliveryDays: 3,
-    category: "video",
-    workerId: "w3",
-    rating: 5.0,
-    reviews: 89,
-    image: "g3",
-  },
-  {
-    id: "k4",
-    title: "Urdu article likhunga",
-    description: "1000 words ka SEO-optimized Urdu article kisi bhi topic par.",
-    price: 1500,
-    deliveryDays: 3,
-    category: "writing",
-    workerId: "w4",
-    rating: 4.7,
-    reviews: 52,
-    image: "g4",
-  },
-  {
-    id: "k5",
-    title: "SEO optimize karunga",
-    description: "On-page SEO audit aur optimization Google ranking ke liye.",
-    price: 8000,
-    deliveryDays: 7,
-    category: "seo",
-    workerId: "w2",
-    rating: 4.8,
-    reviews: 38,
-    image: "g5",
-  },
-  {
-    id: "k6",
-    title: "Facebook page manage karunga",
-    description: "Monthly social media management with 30 posts aur engagement.",
-    price: 12000,
-    deliveryDays: 15,
-    category: "social",
-    workerId: "w5",
-    rating: 4.6,
-    reviews: 19,
-    image: "g6",
-  },
-  {
-    id: "k7",
-    title: "Flutter app banayen",
-    description: "Cross-platform mobile app Android aur iOS ke liye, with API integration.",
-    price: 45000,
-    deliveryDays: 15,
-    category: "app",
-    workerId: "w6",
-    rating: 4.9,
-    reviews: 31,
-    image: "g2",
-  },
-  {
-    id: "k8",
-    title: "Product photography karunga",
-    description: "Professional product shoot with studio lighting aur editing.",
-    price: 6000,
-    deliveryDays: 3,
-    category: "photo",
-    workerId: "w3",
-    rating: 4.9,
-    reviews: 44,
-    image: "g1",
-  },
-  {
-    id: "k9",
-    title: "Brand identity package",
-    description: "Logo, business card, letterhead aur social media templates — sab kuch.",
-    price: 7500,
-    deliveryDays: 7,
-    category: "logo",
-    workerId: "w1",
-    rating: 5.0,
-    reviews: 73,
-    image: "g3",
-  },
-  {
-    id: "k10",
-    title: "Blog content likhunga",
-    description: "Engaging English blog posts 1500 words, SEO friendly aur plagiarism free.",
-    price: 3000,
-    deliveryDays: 3,
-    category: "writing",
-    workerId: "w4",
-    rating: 4.7,
-    reviews: 28,
-    image: "g4",
-  },
-  {
-    id: "k11",
-    title: "Instagram reels banayen",
-    description: "15 viral Instagram reels with trending audio aur captions.",
-    price: 4000,
-    deliveryDays: 7,
-    category: "social",
-    workerId: "w5",
-    rating: 4.6,
-    reviews: 22,
-    image: "g6",
-  },
-  {
-    id: "k12",
-    title: "React website banayen",
-    description: "Modern React + Next.js website with fast loading aur beautiful UI.",
-    price: 35000,
-    deliveryDays: 15,
-    category: "web",
-    workerId: "w6",
-    rating: 4.9,
-    reviews: 17,
-    image: "g2",
-  },
-];
-
-/* Initial user accounts (workers + viewers + admin) for the admin panel */
-const INITIAL_USERS: UserAccount[] = [
-  ...WORKERS.map((w) => ({
-    id: w.id,
-    name: w.name,
-    role: "worker" as UserRole,
-    city: w.city,
-    phone: w.phone,
-    level: w.level,
-    joined: "2024",
-  })),
-  { id: "u1", name: "Bilal Ahmed", role: "viewer" as UserRole, city: "Karachi", phone: "923061111111", joined: "2025" },
-  { id: "u2", name: "Sana Tariq", role: "viewer" as UserRole, city: "Lahore", phone: "923062222222", joined: "2025" },
-  { id: "u3", name: "Usman Ghani", role: "viewer" as UserRole, city: "Islamabad", phone: "923063333333", joined: "2025" },
-  { id: "admin", name: "Site Admin", role: "admin" as UserRole, city: "Islamabad", phone: "923000000000", joined: "2023" },
-];
-
-/* Gradient map for placeholder images */
 const GRADIENTS: Record<string, string> = {
   g1: "from-emerald-500/30 to-teal-600/30",
   g2: "from-sky-500/30 to-indigo-600/30",
@@ -388,83 +134,22 @@ const ROLE_STYLES: Record<UserRole, { badge: string; label: string; icon: string
   admin: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", label: "Admin", icon: "mdi:shield-crown" },
 };
 
-/* Admin access password (demo) */
-const ADMIN_PASSWORD = "BA56CR7VK18";
-
-/* ---------- localStorage keys (persist auth + user-posted kaam, survives export) ---------- */
-const LS_USERS = "hunar_users_db";
-const LS_SESSION = "hunar_session";
-const LS_KAAMS = "hunar_user_kaams";
-const LS_WORKERS = "hunar_user_workers";
-
-function loadStoredUsers(): StoredUser[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LS_USERS);
-    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
-  } catch {
-    return [];
-  }
+/* ---------- API helpers ---------- */
+async function apiGet<T>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})).error) || `Request failed (${res.status})`);
+  return res.json() as Promise<T>;
 }
-function saveStoredUsers(list: StoredUser[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_USERS, JSON.stringify(list));
-  } catch {
-    /* ignore quota */
-  }
-}
-function loadSession(): StoredUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LS_SESSION);
-    return raw ? (JSON.parse(raw) as StoredUser) : null;
-  } catch {
-    return null;
-  }
-}
-function saveSession(u: StoredUser | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (u) window.localStorage.setItem(LS_SESSION, JSON.stringify(u));
-    else window.localStorage.removeItem(LS_SESSION);
-  } catch {
-    /* ignore */
-  }
-}
-function loadUserKaams(): Kaam[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LS_KAAMS);
-    return raw ? (JSON.parse(raw) as Kaam[]) : [];
-  } catch {
-    return [];
-  }
-}
-function saveUserKaams(list: Kaam[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_KAAMS, JSON.stringify(list));
-  } catch {
-    /* ignore quota */
-  }
-}
-function loadUserWorkers(): Worker[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LS_WORKERS);
-    return raw ? (JSON.parse(raw) as Worker[]) : [];
-  } catch {
-    return [];
-  }
-}
-function saveUserWorkers(list: Worker[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_WORKERS, JSON.stringify(list));
-  } catch {
-    /* ignore quota */
-  }
+async function apiSend<T>(method: "POST" | "DELETE", url: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method,
+    credentials: "same-origin",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`);
+  return data as T;
 }
 
 /* ---------- Helpers ---------- */
@@ -568,7 +253,7 @@ function KaamCard({
   onWorker,
 }: {
   kaam: Kaam;
-  worker?: Worker;
+  worker?: Worker | null;
   onOpen: (k: Kaam) => void;
   onWorker: (id: string) => void;
 }) {
@@ -695,8 +380,9 @@ export default function Home() {
   const [authRole, setAuthRole] = useState<"worker" | "viewer" | null>(null);
   const [authError, setAuthError] = useState("");
   const [authForm, setAuthForm] = useState({ name: "", phone: "", city: "", password: "" });
-  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
-  const [storedUsers, setStoredUsers] = useState<StoredUser[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [currentWorkerId, setCurrentWorkerId] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
 
   // kaam detail modal
   const [detailKaam, setDetailKaam] = useState<Kaam | null>(null);
@@ -724,24 +410,24 @@ export default function Home() {
     delivery: "3",
     description: "",
   });
-  const [postSamples, setPostSamples] = useState<string[]>([]); // base64 data URLs
-  const [postThumbnail, setPostThumbnail] = useState<string | null>(null); // main card thumbnail (base64 data URL)
+  const [postSamples, setPostSamples] = useState<string[]>([]);
+  const [postThumbnail, setPostThumbnail] = useState<string | null>(null);
+  const [postBusy, setPostBusy] = useState(false);
 
-  // admin: state-backed users + kaams so they can be deleted
-  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
-  const [kaamsList, setKaamsList] = useState<Kaam[]>(INITIAL_KAAMS);
+  // admin
   const [adminTab, setAdminTab] = useState<"users" | "workers" | "kaam">("users");
   const [adminSearch, setAdminSearch] = useState("");
-
-  // workers are state-backed so admin deletions reflect everywhere (Top Workers, cards, profiles)
-  const [workersList, setWorkersList] = useState<Worker[]>(WORKERS);
-
-  // admin auth
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminError, setAdminError] = useState("");
 
-  /* ---------- Derived: filtered kaams for explore ---------- */
+  /* ---------- Server data (loaded from API) ---------- */
+  const [workersList, setWorkersList] = useState<Worker[]>([]);
+  const [kaamsList, setKaamsList] = useState<Kaam[]>([]);
+  const [adminUsers, setAdminUsers] = useState<UserAccount[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  /* ---------- Derived: filtered kaams for explore (client-side, on already-fetched list) ---------- */
   const filteredKaams = useMemo(() => {
     let list = [...kaamsList];
     if (exploreCat !== "all") {
@@ -749,7 +435,7 @@ export default function Home() {
     }
     if (exploreCity !== "All Cities") {
       list = list.filter((k) => {
-        const w = workersList.find((x) => x.id === k.workerId);
+        const w = k.worker ?? workersList.find((x) => x.id === k.workerId);
         return w?.city === exploreCity;
       });
     }
@@ -793,16 +479,59 @@ export default function Home() {
     [],
   );
 
-  /* ---------- Mount: load persisted auth + user kaams + user workers from localStorage ---------- */
+  /* ---------- Reloaders ---------- */
+  const reloadKaams = useCallback(async () => {
+    try {
+      const data = await apiGet<{ kaams: Kaam[] }>("/api/kaams?limit=200");
+      setKaamsList(data.kaams);
+    } catch (e) {
+      console.error("reloadKaams:", e);
+    }
+  }, []);
+  const reloadWorkers = useCallback(async () => {
+    try {
+      const data = await apiGet<{ workers: Worker[] }>("/api/workers");
+      setWorkersList(data.workers);
+    } catch (e) {
+      console.error("reloadWorkers:", e);
+    }
+  }, []);
+  const reloadAdminUsers = useCallback(async () => {
+    try {
+      const data = await apiGet<{ users: UserAccount[] }>("/api/admin/users");
+      setAdminUsers(data.users);
+    } catch (e) {
+      console.error("reloadAdminUsers:", e);
+    }
+  }, []);
+
+  /* ---------- Mount: load session + initial data ---------- */
   useEffect(() => {
-    const su = loadStoredUsers();
-    setStoredUsers(su);
-    const session = loadSession();
-    if (session) setCurrentUser(session);
-    const userKaams = loadUserKaams();
-    if (userKaams.length) setKaamsList((prev) => [...userKaams, ...prev]);
-    const userWorkers = loadUserWorkers();
-    if (userWorkers.length) setWorkersList((prev) => [...prev, ...userWorkers]);
+    let cancelled = false;
+    (async () => {
+      // session
+      try {
+        const me = await apiGet<{ user: (UserAccount & { level?: WorkerLevel | null }) | null; workerId?: string | null }>("/api/auth/me");
+        if (!cancelled && me.user) {
+          setCurrentUser(me.user);
+          setCurrentWorkerId(me.workerId ?? null);
+        }
+      } catch {
+        /* ignore */
+      }
+      // kaams + workers in parallel
+      const [k, w] = await Promise.all([
+        apiGet<{ kaams: Kaam[] }>("/api/kaams?limit=200").catch(() => ({ kaams: [] as Kaam[] })),
+        apiGet<{ workers: Worker[] }>("/api/workers").catch(() => ({ workers: [] as Worker[] })),
+      ]);
+      if (cancelled) return;
+      setKaamsList(k.kaams);
+      setWorkersList(w.workers);
+      setDataLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* ---------- Auth modal ---------- */
@@ -816,8 +545,8 @@ export default function Home() {
     setAuthModal(true);
   }, []);
 
-  /* Register a new worker/viewer into localStorage */
-  const registerUser = useCallback(() => {
+  /* Register via API */
+  const registerUser = useCallback(async () => {
     if (!authRole) return;
     const phone = authForm.phone.trim();
     if (phone.length < 7) {
@@ -828,79 +557,57 @@ export default function Home() {
       setAuthError("Password must be at least 4 characters.");
       return;
     }
-    // duplicate phone check
-    if (storedUsers.some((u) => u.phone === phone)) {
-      setAuthError("An account with this phone already exists. Please login.");
-      return;
-    }
-    const newUser: StoredUser = {
-      id: `u_${Date.now()}`,
-      name: authForm.name.trim() || "User",
-      role: authRole,
-      city: authForm.city || "Karachi",
-      phone,
-      level: authRole === "worker" ? "New" : undefined,
-      joined: new Date().getFullYear().toString(),
-      password: authForm.password,
-    };
-    const next = [...storedUsers, newUser];
-    setStoredUsers(next);
-    saveStoredUsers(next);
-    setCurrentUser(newUser);
-    saveSession(newUser);
-    // also reflect in admin user list
-    setUsers((prev) => [
-      ...prev,
-      { id: newUser.id, name: newUser.name, role: newUser.role, city: newUser.city, phone: newUser.phone, level: newUser.level, joined: newUser.joined },
-    ]);
-    // if worker, also create a worker profile so they show on cards/profile
-    if (newUser.role === "worker") {
-      const newWorker: Worker = {
-        id: newUser.id,
-        name: newUser.name,
-        city: newUser.city,
-        level: "New",
-        rating: 0,
-        totalKaam: 0,
-        repeatClients: 0,
-        gradient: avatarGradient(newUser.name),
-        initials: newUser.name.charAt(0).toUpperCase() + (newUser.name.split(" ")[1]?.charAt(0)?.toUpperCase() ?? ""),
-        phone: newUser.phone,
-        bio: "New worker on Hunar.pk.",
-        portfolio: ["g1", "g2", "g3", "g4"],
-      };
-      setWorkersList((prev) => {
-        const next = [...prev, newWorker];
-        // persist user-created workers (exclude seed WORKERS)
-        saveUserWorkers(next.filter((w) => w.id.startsWith("u_")));
-        return next;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const data = await apiSend<{ user: UserAccount; workerId: string | null }>("POST", "/api/auth/register", {
+        name: authForm.name.trim() || "User",
+        phone,
+        city: authForm.city || "Karachi",
+        password: authForm.password,
+        role: authRole,
       });
+      setCurrentUser(data.user);
+      setCurrentWorkerId(data.workerId);
+      setAuthModal(false);
+      await Promise.all([reloadKaams(), reloadWorkers()]);
+      showToast(
+        authRole === "worker"
+          ? "Worker account created! You can post kaam now."
+          : "Welcome! Find kaam and chat with workers on WhatsApp.",
+      );
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "Registration failed.");
+    } finally {
+      setAuthBusy(false);
     }
-    setAuthModal(false);
-    showToast(
-      authRole === "worker"
-        ? "Worker account created! You can post kaam now."
-        : "Welcome! Find kaam and chat with workers on WhatsApp.",
-    );
-  }, [authRole, authForm, storedUsers, showToast]);
+  }, [authRole, authForm, reloadKaams, reloadWorkers, showToast]);
 
-  /* Login existing user from localStorage */
-  const loginUser = useCallback(() => {
+  /* Login via API */
+  const loginUser = useCallback(async () => {
     const phone = authForm.phone.trim();
-    const found = storedUsers.find((u) => u.phone === phone);
-    if (!found) {
-      setAuthError("No account found with this phone. Please register first.");
+    if (!phone || !authForm.password) {
+      setAuthError("Please enter phone and password.");
       return;
     }
-    if (found.password !== authForm.password) {
-      setAuthError("Incorrect password. Please try again.");
-      return;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const data = await apiSend<{ user: UserAccount; workerId: string | null }>("POST", "/api/auth/login", {
+        phone,
+        password: authForm.password,
+      });
+      setCurrentUser(data.user);
+      setCurrentWorkerId(data.workerId);
+      setAuthModal(false);
+      await Promise.all([reloadKaams(), reloadWorkers()]);
+      showToast(`Welcome back, ${data.user.name}!`);
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "Login failed.");
+    } finally {
+      setAuthBusy(false);
     }
-    setCurrentUser(found);
-    saveSession(found);
-    setAuthModal(false);
-    showToast(`Welcome back, ${found.name}!`);
-  }, [authForm, storedUsers, showToast]);
+  }, [authForm, reloadKaams, reloadWorkers, showToast]);
 
   const submitAuth = useCallback(
     (e: React.FormEvent) => {
@@ -912,105 +619,58 @@ export default function Home() {
     [authMode, loginUser, registerUser],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await apiSend("POST", "/api/auth/logout");
+    } catch {
+      /* ignore */
+    }
     setCurrentUser(null);
-    saveSession(null);
+    setCurrentWorkerId(null);
+    setAdminAuthed(false);
     showToast("Logged out successfully.", "info");
     goView("home");
   }, [showToast, goView]);
 
-  /* ---------- Post kaam ---------- */
-  const handlePostKaam = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentUser || currentUser.role !== "worker") {
-        showToast("Please create a Worker account first.", "error");
-        openAuth("register");
-        return;
+  /* ---------- Upload helper (file → /api/upload → URL) ---------- */
+  const uploadSingle = useCallback(async (file: File): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "same-origin" });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast((data as { error?: string }).error || "Upload failed.", "error");
+        return null;
       }
-      const delivery = Number(postForm.delivery) as 1 | 3 | 7 | 15;
-      const newKaam: Kaam = {
-        id: `k_${Date.now()}`,
-        title: postForm.title.trim(),
-        description: postForm.description.trim(),
-        price: Number(postForm.price),
-        deliveryDays: delivery,
-        category: postForm.category,
-        workerId: currentUser.id,
-        rating: 5,
-        reviews: 0,
-        image: "g1",
-        thumbnail: postThumbnail ?? undefined,
-        samples: postSamples.length ? postSamples : undefined,
-      };
-      // add to state + persist to localStorage
-      setKaamsList((prev) => {
-        const next = [newKaam, ...prev];
-        // persist only user-posted kaams (exclude initial seed)
-        const userOnes = next.filter((k) => k.id.startsWith("k_"));
-        saveUserKaams(userOnes);
-        return next;
-      });
-      // bump worker totalKaam
-      setWorkersList((prev) =>
-        prev.map((w) => (w.id === currentUser.id ? { ...w, totalKaam: w.totalKaam + 1 } : w)),
-      );
-      showToast("Kaam posted successfully! It is now live.");
-      setPostForm({ title: "", category: "", price: "", delivery: "3", description: "" });
-      setPostSamples([]);
-      setPostThumbnail(null);
-      goView("explore");
-    },
-    [currentUser, postForm, postSamples, postThumbnail, showToast, openAuth, goView],
-  );
+      return (data as { url: string }).url;
+    } catch {
+      showToast("Upload failed.", "error");
+      return null;
+    }
+  }, [showToast]);
 
-  /* ---------- Image upload handler (FileReader → base64) ---------- */
-  const handleSampleUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-      const max = 5;
-      const remaining = max - postSamples.length;
-      if (remaining <= 0) {
-        showToast(`You can upload up to ${max} samples.`, "error");
-        return;
+  const uploadMultiple = useCallback(async (files: File[]): Promise<string[]> => {
+    if (files.length === 0) return [];
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "same-origin" });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast((data as { error?: string }).error || "Upload failed.", "error");
+        return [];
       }
-      const toRead = Array.from(files).slice(0, remaining);
-      let read = 0;
-      toRead.forEach((file) => {
-        if (!file.type.startsWith("image/")) {
-          showToast("Only image files are allowed.", "error");
-          return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-          showToast("Image too large (max 2MB).", "error");
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result as string;
-          setPostSamples((prev) => [...prev, dataUrl]);
-          read++;
-          if (read === toRead.length) {
-            showToast(`${read} sample image(s) added.`, "success");
-          }
-        };
-        reader.onerror = () => showToast("Failed to read image.", "error");
-        reader.readAsDataURL(file);
-      });
-      // reset input so same file can be re-selected
-      e.target.value = "";
-    },
-    [postSamples.length, showToast],
-  );
+      return (data as { urls: string[] }).urls;
+    } catch {
+      showToast("Upload failed.", "error");
+      return [];
+    }
+  }, [showToast]);
 
-  const removeSample = useCallback((idx: number) => {
-    setPostSamples((prev) => prev.filter((_, i) => i !== idx));
-  }, []);
-
-  /* ---------- Thumbnail upload (single main image, shown on the kaam card) ---------- */
+  /* ---------- Thumbnail upload ---------- */
   const handleThumbnailUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (!file.type.startsWith("image/")) {
@@ -1023,16 +683,15 @@ export default function Home() {
         e.target.value = "";
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPostThumbnail(reader.result as string);
+      showToast("Uploading thumbnail...", "info");
+      const url = await uploadSingle(file);
+      if (url) {
+        setPostThumbnail(url);
         showToast("Thumbnail added — this is how your kaam will look.", "success");
-      };
-      reader.onerror = () => showToast("Failed to read image.", "error");
-      reader.readAsDataURL(file);
+      }
       e.target.value = "";
     },
-    [showToast],
+    [uploadSingle, showToast],
   );
 
   const removeThumbnail = useCallback(() => {
@@ -1040,74 +699,151 @@ export default function Home() {
     showToast("Thumbnail removed.", "info");
   }, [showToast]);
 
+  /* ---------- Sample images upload ---------- */
+  const handleSampleUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      const max = 5;
+      const remaining = max - postSamples.length;
+      if (remaining <= 0) {
+        showToast(`You can upload up to ${max} samples.`, "error");
+        e.target.value = "";
+        return;
+      }
+      const toRead = Array.from(files).slice(0, remaining);
+      // validate
+      for (const f of toRead) {
+        if (!f.type.startsWith("image/")) {
+          showToast("Only image files are allowed.", "error");
+          e.target.value = "";
+          return;
+        }
+        if (f.size > 2 * 1024 * 1024) {
+          showToast(`Image "${f.name}" too large (max 2MB).`, "error");
+          e.target.value = "";
+          return;
+        }
+      }
+      showToast(`Uploading ${toRead.length} sample image(s)...`, "info");
+      const urls = await uploadMultiple(toRead);
+      if (urls.length) {
+        setPostSamples((prev) => [...prev, ...urls]);
+        showToast(`${urls.length} sample image(s) added.`, "success");
+      }
+      e.target.value = "";
+    },
+    [postSamples.length, uploadMultiple, showToast],
+  );
+
+  const removeSample = useCallback((idx: number) => {
+    setPostSamples((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  /* ---------- Post kaam via API ---------- */
+  const handlePostKaam = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!currentUser || currentUser.role !== "worker") {
+        showToast("Please create a Worker account first.", "error");
+        openAuth("register");
+        return;
+      }
+      const delivery = Number(postForm.delivery) as 1 | 3 | 7 | 15;
+      setPostBusy(true);
+      try {
+        await apiSend("POST", "/api/kaams", {
+          title: postForm.title.trim(),
+          description: postForm.description.trim(),
+          price: Number(postForm.price),
+          deliveryDays: delivery,
+          category: postForm.category,
+          thumbnail: postThumbnail,
+          samples: postSamples.length ? postSamples : undefined,
+        });
+        await Promise.all([reloadKaams(), reloadWorkers()]);
+        showToast("Kaam posted successfully! It is now live.");
+        setPostForm({ title: "", category: "", price: "", delivery: "3", description: "" });
+        setPostSamples([]);
+        setPostThumbnail(null);
+        goView("explore");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Failed to post kaam.", "error");
+      } finally {
+        setPostBusy(false);
+      }
+    },
+    [currentUser, postForm, postThumbnail, postSamples, showToast, openAuth, goView, reloadKaams, reloadWorkers],
+  );
+
   /* ---------- Admin actions ---------- */
   const deleteKaam = useCallback(
-    (id: string) => {
-      setKaamsList((prev) => {
-        const next = prev.filter((k) => k.id !== id);
-        // sync persisted user kaams
-        const userOnes = next.filter((k) => k.id.startsWith("k_"));
-        saveUserKaams(userOnes);
-        return next;
-      });
-      showToast("Kaam deleted.", "error");
+    async (id: string) => {
+      try {
+        await apiSend("DELETE", `/api/kaams/${id}`);
+        await reloadKaams();
+        showToast("Kaam deleted.", "error");
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Failed to delete kaam.", "error");
+      }
     },
-    [showToast],
+    [reloadKaams, showToast],
   );
 
   const deleteUser = useCallback(
-    (id: string) => {
-      const user = users.find((u) => u.id === id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      // if a worker is removed, also drop their kaam posts and worker profile (Top Workers, cards)
-      if (user?.role === "worker") {
-        setKaamsList((prev) => prev.filter((k) => k.workerId !== id));
-        setWorkersList((prev) => prev.filter((w) => w.id !== id));
+    async (id: string) => {
+      try {
+        await apiSend("DELETE", `/api/admin/users/${id}`);
+        await Promise.all([reloadAdminUsers(), reloadWorkers(), reloadKaams()]);
+        showToast("Account deleted.", "error");
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Failed to delete user.", "error");
       }
-      showToast(`Account deleted — ${user?.name ?? "user"}.`, "error");
     },
-    [users, showToast],
+    [reloadAdminUsers, reloadWorkers, reloadKaams, showToast],
   );
 
   const deleteWorker = useCallback(
-    (id: string) => {
-      const w = workersList.find((x) => x.id === id);
-      setWorkersList((prev) => {
-        const next = prev.filter((x) => x.id !== id);
-        saveUserWorkers(next.filter((x) => x.id.startsWith("u_")));
-        return next;
-      });
-      setKaamsList((prev) => {
-        const next = prev.filter((k) => k.workerId !== id);
-        saveUserKaams(next.filter((k) => k.id.startsWith("k_")));
-        return next;
-      });
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      showToast(`Worker removed — ${w?.name ?? "worker"}.`, "error");
-    },
-    [workersList, showToast],
-  );
-
-  /* ---------- Admin auth ---------- */
-  const adminLogin = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (adminPassword === ADMIN_PASSWORD) {
-        setAdminAuthed(true);
-        setAdminError("");
-        setAdminPassword("");
-        showToast("Admin access granted.", "success");
-      } else {
-        setAdminError("Incorrect password. Access denied.");
+    async (id: string) => {
+      try {
+        await apiSend("DELETE", `/api/workers/${id}`);
+        await Promise.all([reloadAdminUsers(), reloadWorkers(), reloadKaams()]);
+        showToast("Worker removed.", "error");
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Failed to delete worker.", "error");
       }
     },
-    [adminPassword, showToast],
+    [reloadAdminUsers, reloadWorkers, reloadKaams, showToast],
   );
 
-  const adminLogout = useCallback(() => {
+  /* ---------- Admin auth (server-side password verify) ---------- */
+  const adminLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setAdminError("");
+      try {
+        await apiSend("POST", "/api/admin/verify", { password: adminPassword });
+        setAdminAuthed(true);
+        setAdminPassword("");
+        await reloadAdminUsers();
+        showToast("Admin access granted.", "success");
+      } catch (err) {
+        setAdminError(err instanceof Error ? err.message : "Access denied.");
+      }
+    },
+    [adminPassword, reloadAdminUsers, showToast],
+  );
+
+  const adminLogout = useCallback(async () => {
+    try {
+      await apiSend("POST", "/api/admin/logout");
+    } catch {
+      /* ignore */
+    }
     setAdminAuthed(false);
     setAdminPassword("");
     setAdminError("");
+    setAdminUsers([]);
     showToast("Admin panel locked.", "info");
   }, [showToast]);
 
@@ -1137,30 +873,32 @@ export default function Home() {
   }, [detailKaam, authModal, profileWorkerId]);
 
   const getWorker = useCallback(
-    (id: string) => workersList.find((w) => w.id === id),
+    (id: string) => workersList.find((w) => w.id === id) ?? null,
     [workersList],
   );
   const profileWorker = profileWorkerId ? getWorker(profileWorkerId) : null;
-  const detailWorker = detailKaam ? getWorker(detailKaam.workerId) : undefined;
+  const detailWorker = detailKaam
+    ? detailKaam.worker ?? getWorker(detailKaam.workerId)
+    : null;
 
   /* Admin stats */
   const adminStats = useMemo(
     () => ({
-      total: users.length,
+      total: adminUsers.length,
       workers: workersList.length,
-      viewers: users.filter((u) => u.role === "viewer").length,
+      viewers: adminUsers.filter((u) => u.role === "viewer").length,
       kaam: kaamsList.length,
     }),
-    [users, kaamsList, workersList],
+    [adminUsers, kaamsList, workersList],
   );
 
   const filteredAdminUsers = useMemo(() => {
     const q = adminSearch.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
+    if (!q) return adminUsers;
+    return adminUsers.filter(
       (u) => u.name.toLowerCase().includes(q) || u.city.toLowerCase().includes(q),
     );
-  }, [users, adminSearch]);
+  }, [adminUsers, adminSearch]);
 
   /* ============================================================
      RENDER
@@ -1241,6 +979,7 @@ export default function Home() {
                 Login
               </button>
             )}
+
             <button
               onClick={() => (currentUser ? goView("post") : openAuth())}
               className="inline-flex items-center gap-1.5 rounded-lg bg-green-500 px-4 py-2 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
@@ -1405,8 +1144,11 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 {kaamsList.slice(0, 4).map((k) => (
-                  <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                  <KaamCard key={k.id} kaam={k} worker={k.worker ?? getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                 ))}
+                {!dataLoaded && kaamsList.length === 0 && (
+                  <p className="col-span-full py-8 text-center text-sm text-slate-500">Loading kaam…</p>
+                )}
               </div>
             </section>
 
@@ -1429,6 +1171,9 @@ export default function Home() {
                 {workersList.slice(0, 3).map((w) => (
                   <WorkerCard key={w.id} worker={w} onOpen={openWorkerProfile} />
                 ))}
+                {!dataLoaded && workersList.length === 0 && (
+                  <p className="col-span-3 py-8 text-center text-sm text-slate-500">Loading workers…</p>
+                )}
               </div>
             </section>
 
@@ -1557,7 +1302,7 @@ export default function Home() {
               ) : (
                 <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
                   {filteredKaams.map((k) => (
-                    <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                    <KaamCard key={k.id} kaam={k} worker={k.worker ?? getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                   ))}
                 </div>
               )}
@@ -1805,10 +1550,11 @@ export default function Home() {
 
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
+                disabled={postBusy}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <iconify-icon icon="mdi:rocket-launch" width={18} />
-                Post Kaam
+                <iconify-icon icon={postBusy ? "mdi:loading mdi-spin" : "mdi:rocket-launch"} width={18} />
+                {postBusy ? "Posting…" : "Post Kaam"}
               </button>
             </form>
           </div>
@@ -2175,7 +1921,7 @@ export default function Home() {
                 ) : (
                   <div className="hunar-scroll max-h-[60vh] space-y-2 overflow-y-auto pr-1">
                     {kaamsList.map((k) => {
-                      const w = getWorker(k.workerId);
+                      const w = k.worker ?? getWorker(k.workerId);
                       const cat = CATEGORIES.find((c) => c.id === k.category);
                       return (
                         <div
@@ -2309,7 +2055,7 @@ export default function Home() {
                 {kaamsList
                   .filter((k) => k.workerId === profileWorker.id)
                   .map((k) => (
-                    <KaamCard key={k.id} kaam={k} worker={getWorker(k.workerId)} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
+                    <KaamCard key={k.id} kaam={k} worker={k.worker ?? profileWorker} onOpen={setDetailKaam} onWorker={openWorkerProfile} />
                   ))}
                 {kaamsList.filter((k) => k.workerId === profileWorker.id).length === 0 && (
                   <p className="col-span-full text-sm text-slate-400">This worker has no other kaam yet.</p>
@@ -2576,8 +2322,10 @@ export default function Home() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400"
+                  disabled={authBusy}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3 text-sm font-bold text-green-950 transition-colors hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
+                  {authBusy && <iconify-icon icon="mdi:loading mdi-spin" width={18} />}
                   {authMode === "login" ? "Login" : "Create Account"}
                 </button>
 
@@ -2614,6 +2362,13 @@ export default function Home() {
                     </>
                   )}
                 </p>
+
+                {/* Demo credentials hint */}
+                {authMode === "login" && (
+                  <p className="rounded-lg border border-white/5 bg-slate-950/40 px-3 py-2 text-center text-[11px] text-slate-500">
+                    Demo worker: <span className="text-slate-300">923001234567</span> / <span className="text-slate-300">worker123</span>
+                  </p>
+                )}
               </form>
             )}
           </div>

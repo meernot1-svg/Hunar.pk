@@ -34,3 +34,56 @@ Stage Summary:
 - Admin password gate (password "BA56CR7VK18") and state-backed workers (with cascade delete) from the previous iteration remain intact and verified working.
 - All file inputs now use `sr-only` instead of `hidden` for better accessibility and testability.
 - Artifacts produced: modified `src/app/page.tsx` only.
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: Add a real database backend to Hunar.pk — replace localStorage/demo data with Prisma + SQLite so every user, kaam, worker, and thumbnail persists in a real DB and is shared across all visitors/devices. Auth becomes server-side (hashed passwords + signed cookie sessions), thumbnail uploads save to disk via a file-upload API, and admin actions are server-authorized.
+
+Work Log:
+- Installed `bcryptjs` + `jose` (+ `@types/bcryptjs`) for password hashing and signed JWT cookie sessions.
+- Designed Prisma schema (`prisma/schema.prisma`) with three models: `User` (id/name/phone/password/role/city/joined), `Worker` (linked to User via userId, with level/rating/totalKaam/portfolio JSON), `Kaam` (linked to Worker, with thumbnail/samples JSON). Cascade deletes: User → Worker → Kaam.
+- Ran `bun run db:push` to sync the schema to SQLite (`db/custom.db`).
+- Created `src/lib/auth.ts`: `hashPassword`/`verifyPassword` (bcrypt), `signSession`/`verifySession` (jose HS256 JWT), `setSessionCookie`/`clearSessionCookie`/`getSession` (httpOnly, SameSite=Lax, 30-day), plus a SEPARATE admin-panel cookie system (`setAdminCookie`/`clearAdminCookie`/`isAdminAuthed`/`authorizeAdmin`) so the admin password gate works regardless of which user is logged in.
+- Created `src/lib/upload.ts`: saves uploaded images to `/public/uploads/<random>-<ts>.<ext>`, validates type (PNG/JPG/WEBP/GIF) + 2MB max, returns URL path.
+- Created `src/lib/types.ts`: shared DTOs (`WorkerDTO`, `KaamDTO`, `UserAccountDTO`) + `toWorkerDTO`/`toKaamDTO`/`toUserDTO` converters + `ADMIN_PANEL_PASSWORD` constant (server-side only, NOT shipped to client).
+- Created `scripts/seed.ts` + added `db:seed` script to package.json. Seeded: 1 admin (phone 923000000000 / pw admin123), 6 workers (phone 92300XXXXXXX / pw worker123) with linked User+Worker profiles, 3 viewers (pw viewer123), 12 kaam posts. Ran `bun run db:seed` successfully.
+- Built API routes:
+  - `POST /api/auth/register` — creates User (+ Worker if role=worker), sets session cookie, returns user+workerId.
+  - `POST /api/auth/login` — verifies bcrypt password, sets session cookie.
+  - `POST /api/auth/logout` — clears session cookie.
+  - `GET /api/auth/me` — returns current user from session (or null).
+  - `GET /api/kaams` — list with filters (category/city/search/sort/limit), joins worker.
+  - `POST /api/kaams` — create (requires worker session), bumps worker.totalKaam.
+  - `DELETE /api/kaams/[id]` — owner or admin can delete.
+  - `GET /api/workers` — list all workers.
+  - `GET /api/workers/[id]` — worker + their kaams.
+  - `DELETE /api/workers/[id]` — admin only, cascades to user + kaams.
+  - `POST /api/admin/verify` — checks password, sets admin cookie.
+  - `POST /api/admin/logout` — clears admin cookie.
+  - `GET /api/admin/users` — admin only, list all users with worker level enrichment.
+  - `DELETE /api/admin/users/[id]` — admin only, blocks admin deletion, cascades.
+  - `POST /api/upload` — multipart (single `file` or multiple `files`), requires login, saves to disk, returns URL(s).
+- Rewrote `src/app/page.tsx` (~2300 lines): removed ALL localStorage logic + seed constants. Now fetches `/api/auth/me`, `/api/kaams`, `/api/workers` on mount. Auth/register/login/logout call API. Post kaam calls `/api/kaams`. Thumbnail/sample uploads call `/api/upload` (files saved to disk, URL stored). Admin verify calls `/api/admin/verify` (server-side password check — password no longer in client bundle). Admin delete user/worker/kaam call respective API endpoints with cascade. Added loading states + busy spinners on submit buttons + demo-credentials hint in login modal.
+- Fixed lint issues: empty interface → type alias in types.ts; removed stray eslint-disable in seed.ts.
+- Fixed admin auth design bug: admin routes initially required `session.role === "admin"`, but the admin panel is gated by password not user-session. Added separate signed admin cookie + `authorizeAdmin()` helper that accepts either an admin user session OR the admin cookie. Updated admin verify/users/workers routes to use it.
+
+Browser Verification (Agent Browser + VLM):
+- Home page loads with real DB data (seeded workers + kaams visible).
+- Logged in as seeded worker Ahmed Raza (923001234567 / worker123) via API — session cookie set, header shows "A Ahmed Raza".
+- Posted a kaam "Database test kaam with real thumbnail" with a test PNG thumbnail → `POST /api/upload` saved file to `/public/uploads/`, `POST /api/kaams` created the row with `thumbnail=/uploads/...png`. Kaam appeared on Explore with the real photo (VLM confirmed). Verified in DB directly via `bun -e` query.
+- Admin panel: wrong password → "Incorrect password. Access denied." (blocked). Correct password "BA56CR7VK18" → unlocked, stats showed real DB counts (10 users / 6 workers / 3 viewers / 13 kaams) matching a direct DB count query.
+- Deleted a viewer (Usman Ghani) via admin → stats updated to 9/6/2/13, confirming server-side cascade delete.
+- Logged out, registered a brand-new worker "Test Worker Multi" (923099999999), posted a kaam "Multi-user DB test kaam" with thumbnail → appeared on Explore. Performed a FULL PAGE RELOAD → the new kaam + new worker + session all persisted (proving DB-backed, not in-memory).
+- Worker totalKaam counter incremented correctly: Ahmed Raza went from 214 → 215 after posting.
+- No browser console errors, no server errors, lint clean.
+
+Stage Summary:
+- Hunar.pk is now a real database-backed application: Prisma + SQLite for storage, bcrypt-hashed passwords, signed httpOnly JWT cookie sessions, file uploads saved to disk, server-side admin authorization.
+- Data is now shared across all visitors/devices — when Sara posts a kaam, Ali sees it immediately from any browser. This was the core limitation of the previous localStorage demo.
+- Admin password ("BA56CR7VK18") is now validated server-side and no longer appears in the client JS bundle.
+- Thumbnail/sample images are saved as real files in `/public/uploads/` (not base64 in the DB), keeping the DB lean.
+- Cascade deletes work at the DB level: deleting a user removes their worker profile + all their kaam posts.
+- Seeded demo accounts: admin (923000000000/admin123), workers (92300XXXXXXX/worker123), viewers (92306XXXXXXX/viewer123).
+- Artifacts: `prisma/schema.prisma`, `src/lib/{db,auth,upload,types}.ts`, `scripts/seed.ts`, 11 API route files under `src/app/api/`, rewritten `src/app/page.tsx`, updated `package.json` (+db:seed script, +bcryptjs/jose deps).
+

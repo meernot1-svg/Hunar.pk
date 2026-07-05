@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Hunar.pk — Prisma schema
+// Pakistan's biggest local freelancing network.
+// SQLite-backed: users, workers, kaam posts.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +11,65 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/* ---------- Enums (modeled as String for SQLite simplicity) ---------- */
+// UserRole:   "worker" | "viewer" | "admin"
+// WorkerLevel: "New" | "Rising" | "Top"
+
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  name      String
+  phone     String   @unique
+  password  String   // bcrypt hash
+  role      String   @default("viewer") // worker | viewer | admin
+  city      String   @default("Karachi")
+  joined    String   @default("2025") // year string for display
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // If this user is a worker, the linked worker profile
+  worker    Worker?
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Worker {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  city          String
+  level         String   @default("New") // New | Rising | Top
+  rating        Float    @default(0)
+  totalKaam     Int      @default(0)
+  repeatClients Int      @default(0)
+  phone         String
+  bio           String   @default("New worker on Hunar.pk.")
+  gradient      String   @default("from-emerald-500 to-teal-600")
+  initials      String   @default("U")
+  // Portfolio stored as a JSON-encoded string array of gradient keys
+  portfolio     String   @default("[\"g1\",\"g2\",\"g3\",\"g4\"]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  kaams Kaam[]
+}
+
+model Kaam {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  price        Int
+  deliveryDays Int      // 1 | 3 | 7 | 15
+  category     String   // category id
+  rating       Float    @default(5)
+  reviews      Int      @default(0)
+  image        String   @default("g1") // gradient fallback key
+  thumbnail    String?  // uploaded thumbnail URL (e.g. /uploads/xxx.png)
+  // Samples stored as a JSON-encoded string array of URLs
+  samples      String?  // JSON string array
+  workerId     String
+  worker       Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([workerId])
 }
