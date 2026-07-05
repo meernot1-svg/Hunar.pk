@@ -87,3 +87,40 @@ Stage Summary:
 - Seeded demo accounts: admin (923000000000/admin123), workers (92300XXXXXXX/worker123), viewers (92306XXXXXXX/viewer123).
 - Artifacts: `prisma/schema.prisma`, `src/lib/{db,auth,upload,types}.ts`, `scripts/seed.ts`, 11 API route files under `src/app/api/`, rewritten `src/app/page.tsx`, updated `package.json` (+db:seed script, +bcryptjs/jose deps).
 
+
+---
+Task ID: 11
+Agent: Main (database + Vercel-readiness)
+Task: Verify the database backend is fully functional and make uploads Vercel/Supabase-ready (user chose Path B: Vercel + Supabase free tier).
+
+Work Log:
+- Inspected project state: previous session had already built the full DB stack (Prisma schema, db client, auth lib with bcrypt+JWT, types, upload lib, all API routes, seed script, page.tsx refactored to fetch-based — 0 localStorage references).
+- Confirmed dev server healthy: all API routes returning 200, 7 workers + 14 kaams seeded.
+- Identified Vercel blocker: upload.ts saved files to /public/uploads/ (ephemeral on Vercel — would vanish on redeploy).
+- Refactored src/lib/upload.ts to convert uploads to base64 data URLs stored directly in the DB (Kaam.thumbnail/samples). Works on Vercel/Railway/local with zero external services. Capped at 1.5MB.
+- Ran `bun run lint` — clean, zero errors.
+- Agent Browser verification (golden path):
+  * Home page renders with real DB data (trending kaams, workers, categories).
+  * Admin password gate renders and accepts BA56CR7VK18 → shows user dashboard with delete buttons.
+- API-level verification (curl with cookie jar):
+  * POST /api/auth/register → created user + worker profile (id returned).
+  * POST /api/auth/login → bcrypt verify + JWT cookie set.
+  * GET /api/auth/me → session persists via httpOnly cookie.
+  * POST /api/upload → returns base64 data URL (Vercel-ready, no filesystem).
+  * POST /api/kaams → created kaam with base64 thumbnail stored in DB.
+  * POST /api/admin/verify → {"ok":true} with password BA56CR7VK18.
+  * GET /api/admin/users → listed 11 users.
+  * DELETE /api/admin/users/{id} → cascade delete confirmed: user 11→10, kaams 15→14, test kaam gone.
+
+Stage Summary:
+- Database backend is FULLY FUNCTIONAL and verified end-to-end.
+- Upload system is now Vercel-ready (base64 in DB, no filesystem dependency).
+- Ready to deploy to Vercel + Supabase. Deployment steps for user:
+  1. Push code to GitHub.
+  2. Create Vercel project from repo.
+  3. Create Supabase project (free) → get DATABASE_URL (PostgreSQL).
+  4. In prisma/schema.prisma change `provider = "sqlite"` → `provider = "postgresql"`.
+  5. Set env vars in Vercel: DATABASE_URL (Supabase), AUTH_SECRET (random string), ADMIN_PASSWORD (BA56CR7VK18).
+  6. Run `npx prisma db push` once (or add to build command: `prisma generate && prisma db push`).
+  7. Run seed: `bun run db:seed` (or add a one-time seed script).
+  8. Deploy. Total cost: $0/month.

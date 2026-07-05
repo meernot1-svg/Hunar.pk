@@ -1,16 +1,27 @@
-import { promises as fs } from "fs";
-import path from "path";
-import crypto from "crypto";
-
 /* ============================================================
-   Hunar.pk — File upload utilities
-   Saves uploaded images to /public/uploads and returns the
-   publicly-served URL path (e.g. /uploads/abc123.png).
+   Hunar.pk — Image upload utilities (Vercel/Supabase-ready)
+   ------------------------------------------------------------
+   Images are converted to base64 data URLs and stored directly
+   in the database (Kaam.thumbnail / Kaam.samples). This makes
+   the app fully portable:
+     - Works locally (SQLite)
+     - Works on Railway (Postgres)
+     - Works on Vercel (Supabase) — no ephemeral filesystem issues
+     - No external bucket service (Cloudinary/S3) required
+
+   Trade-off: base64 inflates size ~33%. We cap uploads at 1.5MB
+   to keep DB rows reasonable. Supabase free tier (500MB) easily
+   holds thousands of thumbnails.
    ============================================================ */
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
-const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
-const ALLOWED = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
+const MAX_SIZE = 1.5 * 1024 * 1024; // 1.5 MB
+const ALLOWED = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]);
 
 export function isAllowedImage(file: File): boolean {
   return ALLOWED.has(file.type.toLowerCase());
@@ -21,34 +32,27 @@ export function isUnderSizeLimit(file: File): boolean {
 }
 
 /**
- * Save an uploaded image file to /public/uploads.
- * Returns the URL path that can be served from /uploads/...
+ * Validate + convert an uploaded image to a base64 data URL.
+ * Returns a string like "data:image/png;base64,iVBORw0KG..." which
+ * can be stored in the DB and used directly in <img src="...">.
+ *
+ * Server-side: uses File.arrayBuffer() + Buffer.toString("base64"),
+ * which works in Next.js Route Handlers on Node.js 18+.
  */
 export async function saveUploadedImage(file: File): Promise<string> {
   if (!isAllowedImage(file)) {
     throw new Error("Only PNG, JPG, WEBP, or GIF images are allowed.");
   }
   if (!isUnderSizeLimit(file)) {
-    throw new Error("Image too large (max 2MB).");
+    throw new Error("Image too large (max 1.5MB).");
   }
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-
-  // Build a unique filename: <random>-<timestamp>.<ext>
-  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-  const id = crypto.randomBytes(10).toString("hex");
-  const filename = `${id}-${Date.now()}.${ext}`;
-  const filepath = path.join(UPLOAD_DIR, filename);
-
   const bytes = await file.arrayBuffer();
-  await fs.writeFile(filepath, Buffer.from(bytes));
-
-  return `/uploads/${filename}`;
+  const buffer = Buffer.from(bytes);
+  const base64 = buffer.toString("base64");
+  return `data:${file.type};base64,${base64}`;
 }
 
-/**
- * Save multiple uploaded image files. Returns array of URL paths.
- * Stops on first error.
- */
+/** Validate + convert multiple uploaded images to base64 data URLs. */
 export async function saveUploadedImageList(files: File[]): Promise<string[]> {
   const out: string[] = [];
   for (const f of files) {
