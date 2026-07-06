@@ -137,6 +137,7 @@ export async function POST(req: Request) {
     const { data: created, error: insertErr } = await supabase
       .from("Kaam")
       .insert({
+        id: crypto.randomUUID(),
         title,
         description,
         price,

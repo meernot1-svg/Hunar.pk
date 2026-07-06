@@ -35,11 +35,13 @@ export async function POST(req: Request) {
 
     const hashed = await hashPassword(password);
     const year = String(new Date().getFullYear());
+    const userId = crypto.randomUUID();
 
     // Insert the user row
     const { data: user, error: uErr } = await supabase
       .from("User")
       .insert({
+        id: userId,
         name,
         phone,
         password: hashed,
@@ -56,9 +58,11 @@ export async function POST(req: Request) {
     // Optionally insert a linked worker profile
     let worker: { id: string; level: string } | null = null;
     if (role === "worker") {
+      const workerId = crypto.randomUUID();
       const { data: w, error: wErr } = await supabase
         .from("Worker")
         .insert({
+          id: workerId,
           userId: user.id,
           name,
           city,
