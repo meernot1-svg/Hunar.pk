@@ -51,7 +51,7 @@ export interface UserAccountDTO {
 export type SessionUserDTO = UserAccountDTO;
 
 /* Admin password (server-side constant, NOT shipped to client) */
-export const ADMIN_PANEL_PASSWORD = "BA56CR7VK18";
+export const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PASSWORD || "BA56CR7VK18";
 
 /* Helper: convert a Prisma Worker row → WorkerDTO */
 export function toWorkerDTO(w: {

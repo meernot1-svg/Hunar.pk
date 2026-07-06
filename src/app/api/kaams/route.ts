@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/auth";
 import { toKaamDTO, toWorkerDTO } from "@/lib/types";
 
@@ -17,14 +17,43 @@ export async function GET(req: Request) {
     const limitParam = url.searchParams.get("limit");
     const limit = limitParam ? Math.min(200, parseInt(limitParam, 10) || 200) : 200;
 
-    // We need worker info for city filter + display, so include worker
-    const rows = await db.kaam.findMany({
-      include: { worker: true },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+    // Step 1: Get kaams (newest first)
+    const { data: kaamRows, error } = await supabase
+      .from("Kaam")
+      .select("*")
+      .order("createdAt", { ascending: false })
+      .limit(limit);
 
-    let filtered = rows;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = kaamRows ?? [];
+
+    // Step 2: Get unique worker IDs and fetch workers in a single query
+    const workerIds = [...new Set(rows.map((k) => k.workerId).filter(Boolean))];
+    const workerMap = new Map<string, ReturnType<typeof toWorkerDTO>>();
+
+    if (workerIds.length > 0) {
+      const { data: workerRows, error: wErr } = await supabase
+        .from("Worker")
+        .select("*")
+        .in("id", workerIds);
+      if (wErr) {
+        throw new Error(wErr.message);
+      }
+      for (const w of workerRows ?? []) {
+        workerMap.set(w.id, toWorkerDTO(w));
+      }
+    }
+
+    // Step 3: Merge worker info into kaam rows, then filter
+    const merged = rows.map((k) => ({
+      ...k,
+      worker: workerMap.get(k.workerId) ?? null,
+    }));
+
+    let filtered = merged;
     if (category !== "all") filtered = filtered.filter((k) => k.category === category);
     if (city !== "All Cities") filtered = filtered.filter((k) => k.worker?.city === city);
     if (search) {
@@ -41,7 +70,7 @@ export async function GET(req: Request) {
 
     const kaams = filtered.map((k) => ({
       ...toKaamDTO(k),
-      worker: k.worker ? toWorkerDTO(k.worker) : null,
+      worker: k.worker,
     }));
 
     return NextResponse.json({ kaams, total: kaams.length });
@@ -86,7 +115,14 @@ export async function POST(req: Request) {
     }
 
     // Find the worker profile linked to this user
-    const worker = await db.worker.findUnique({ where: { userId: session.uid } });
+    const { data: worker, error: wErr } = await supabase
+      .from("Worker")
+      .select("*")
+      .eq("userId", session.uid)
+      .maybeSingle();
+    if (wErr) {
+      throw new Error(wErr.message);
+    }
     if (!worker) {
       return NextResponse.json({ error: "Worker profile not found." }, { status: 404 });
     }
@@ -97,8 +133,10 @@ export async function POST(req: Request) {
       samplesJson = JSON.stringify(clean);
     }
 
-    const created = await db.kaam.create({
-      data: {
+    // Insert kaam and return the created row
+    const { data: created, error: insertErr } = await supabase
+      .from("Kaam")
+      .insert({
         title,
         description,
         price,
@@ -110,18 +148,27 @@ export async function POST(req: Request) {
         image: "g1", // gradient fallback
         thumbnail,
         samples: samplesJson,
-      },
-    });
+      })
+      .select("*")
+      .single();
+    if (insertErr) {
+      throw new Error(insertErr.message);
+    }
 
-    // bump worker totalKaam
-    await db.worker.update({
-      where: { id: worker.id },
-      data: { totalKaam: { increment: 1 } },
-    });
+    // Bump worker totalKaam (read-then-write; race conditions acceptable at this scale)
+    const newTotal = (worker.totalKaam ?? 0) + 1;
+    const { error: updateErr } = await supabase
+      .from("Worker")
+      .update({ totalKaam: newTotal })
+      .eq("id", worker.id);
+    if (updateErr) {
+      console.error("[kaams POST] failed to bump totalKaam:", updateErr.message);
+    }
 
     return NextResponse.json({ kaam: toKaamDTO(created) });
   } catch (e) {
     console.error("[kaams POST] error:", e);
-    return NextResponse.json({ error: "Failed to post kaam." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Failed to post kaam.", detail: msg }, { status: 500 });
   }
 }

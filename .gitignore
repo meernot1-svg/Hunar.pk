@@ -69,3 +69,4 @@ server.log
 # Tool results / scratch
 /tool-results/
 upload/
+.zscripts/

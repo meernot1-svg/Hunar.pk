@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { toWorkerDTO } from "@/lib/types";
 
 /* GET /api/workers
@@ -7,10 +7,15 @@ import { toWorkerDTO } from "@/lib/types";
  */
 export async function GET() {
   try {
-    const rows = await db.worker.findMany({
-      orderBy: [{ totalKaam: "desc" }, { rating: "desc" }],
-    });
-    const workers = rows.map(toWorkerDTO);
+    const { data: rows, error } = await supabase
+      .from("Worker")
+      .select("*")
+      .order("totalKaam", { ascending: false })
+      .order("rating", { ascending: false });
+    if (error) {
+      throw new Error(error.message);
+    }
+    const workers = (rows ?? []).map(toWorkerDTO);
     return NextResponse.json({ workers });
   } catch (e) {
     console.error("[workers GET] error:", e);

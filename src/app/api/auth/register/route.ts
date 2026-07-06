@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { toUserDTO, type UserRole } from "@/lib/types";
 
@@ -20,7 +20,15 @@ export async function POST(req: Request) {
     if (phone.length < 7) return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
     if (password.length < 4) return NextResponse.json({ error: "Password must be at least 4 characters." }, { status: 400 });
 
-    const existing = await db.user.findUnique({ where: { phone } });
+    // Check existing phone
+    const { data: existing, error: exErr } = await supabase
+      .from("User")
+      .select("id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (exErr) {
+      throw new Error(exErr.message);
+    }
     if (existing) {
       return NextResponse.json({ error: "An account with this phone already exists. Please login." }, { status: 409 });
     }
@@ -28,43 +36,59 @@ export async function POST(req: Request) {
     const hashed = await hashPassword(password);
     const year = String(new Date().getFullYear());
 
-    const user = await db.user.create({
-      data: {
+    // Insert the user row
+    const { data: user, error: uErr } = await supabase
+      .from("User")
+      .insert({
         name,
         phone,
         password: hashed,
         role,
         city,
         joined: year,
-        ...(role === "worker"
-          ? {
-              worker: {
-                create: {
-                  name,
-                  city,
-                  level: "New",
-                  rating: 0,
-                  totalKaam: 0,
-                  repeatClients: 0,
-                  phone,
-                  bio: "New worker on Hunar.pk.",
-                  gradient: avatarGradient(name),
-                  initials: makeInitials(name),
-                  portfolio: JSON.stringify(["g1", "g2", "g3", "g4"]),
-                },
-              },
-            }
-          : {}),
-      },
-      include: { worker: true },
-    });
+      })
+      .select("*")
+      .single();
+    if (uErr) {
+      throw new Error(uErr.message);
+    }
+
+    // Optionally insert a linked worker profile
+    let worker: { id: string; level: string } | null = null;
+    if (role === "worker") {
+      const { data: w, error: wErr } = await supabase
+        .from("Worker")
+        .insert({
+          userId: user.id,
+          name,
+          city,
+          level: "New",
+          rating: 0,
+          totalKaam: 0,
+          repeatClients: 0,
+          phone,
+          bio: "New worker on Hunar.pk.",
+          gradient: avatarGradient(name),
+          initials: makeInitials(name),
+          portfolio: JSON.stringify(["g1", "g2", "g3", "g4"]),
+        })
+        .select("id, level")
+        .single();
+      if (wErr) {
+        // Best-effort cleanup: delete the user we just created so we don't
+        // leave an orphaned user without a worker profile.
+        await supabase.from("User").delete().eq("id", user.id);
+        throw new Error(wErr.message);
+      }
+      worker = w;
+    }
 
     await setSessionCookie({ uid: user.id, role: user.role, name: user.name });
 
     const dto = toUserDTO(user);
     return NextResponse.json({
-      user: { ...dto, level: user.worker?.level ?? null },
-      workerId: user.worker?.id ?? null,
+      user: { ...dto, level: worker?.level ?? null },
+      workerId: worker?.id ?? null,
     });
   } catch (e) {
     console.error("[register] error:", e);

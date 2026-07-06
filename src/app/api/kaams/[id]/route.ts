@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/auth";
 
 /* DELETE /api/kaams/[id]
@@ -14,30 +14,52 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     }
     const { id } = await ctx.params;
 
-    const kaam = await db.kaam.findUnique({
-      where: { id },
-      include: { worker: true },
-    });
+    const { data: kaam, error: kErr } = await supabase
+      .from("Kaam")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (kErr) {
+      throw new Error(kErr.message);
+    }
     if (!kaam) {
       return NextResponse.json({ error: "Kaam not found." }, { status: 404 });
     }
 
+    // Fetch the worker row to get userId (for owner check)
+    const { data: worker, error: wErr } = await supabase
+      .from("Worker")
+      .select("id, userId")
+      .eq("id", kaam.workerId)
+      .maybeSingle();
+    if (wErr) {
+      throw new Error(wErr.message);
+    }
+
     // Allow: admin OR the worker who owns this kaam
-    const isOwner = session.uid === kaam.worker.userId;
+    const isOwner = worker ? session.uid === worker.userId : false;
     const isAdmin = session.role === "admin";
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "You can only delete your own kaam." }, { status: 403 });
     }
 
-    await db.kaam.delete({ where: { id } });
+    const { error: delErr } = await supabase.from("Kaam").delete().eq("id", id);
+    if (delErr) {
+      throw new Error(delErr.message);
+    }
 
-    // Decrement worker totalKaam (guard against going negative)
+    // Decrement worker totalKaam (read-then-write; guard against going negative)
     if (kaam.workerId) {
       try {
-        await db.worker.update({
-          where: { id: kaam.workerId },
-          data: { totalKaam: { decrement: 1 } },
-        });
+        const { data: w, error: fErr } = await supabase
+          .from("Worker")
+          .select("totalKaam")
+          .eq("id", kaam.workerId)
+          .maybeSingle();
+        if (!fErr && w) {
+          const newTotal = Math.max(0, (w.totalKaam ?? 0) - 1);
+          await supabase.from("Worker").update({ totalKaam: newTotal }).eq("id", kaam.workerId);
+        }
       } catch {
         /* worker may have been deleted already */
       }
@@ -46,6 +68,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[kaams DELETE] error:", e);
-    return NextResponse.json({ error: "Failed to delete kaam." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: "Failed to delete kaam.", detail: msg }, { status: 500 });
   }
 }

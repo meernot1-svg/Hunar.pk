@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/auth";
 import { toUserDTO } from "@/lib/types";
 
@@ -9,16 +9,28 @@ export async function GET() {
     const session = await getSession();
     if (!session) return NextResponse.json({ user: null });
 
-    const user = await db.user.findUnique({
-      where: { id: session.uid },
-      include: { worker: true },
-    });
+    const { data: user, error: uErr } = await supabase
+      .from("User")
+      .select("*")
+      .eq("id", session.uid)
+      .maybeSingle();
+    if (uErr) {
+      console.error("[me] error:", uErr.message);
+      return NextResponse.json({ user: null });
+    }
     if (!user) return NextResponse.json({ user: null });
+
+    // Fetch linked worker to enrich the response with level/workerId
+    const { data: worker } = await supabase
+      .from("Worker")
+      .select("id, level")
+      .eq("userId", user.id)
+      .maybeSingle();
 
     const dto = toUserDTO(user);
     return NextResponse.json({
-      user: { ...dto, level: user.worker?.level ?? null },
-      workerId: user.worker?.id ?? null,
+      user: { ...dto, level: worker?.level ?? null },
+      workerId: worker?.id ?? null,
     });
   } catch (e) {
     console.error("[me] error:", e);
